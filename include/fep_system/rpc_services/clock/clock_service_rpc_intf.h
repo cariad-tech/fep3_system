@@ -1,24 +1,22 @@
 /**
- * Declaration of the Class IRPCParticipantInfo. (can be reached from over rpc)
- *
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
 #pragma once
 
@@ -75,8 +73,8 @@ public:
     /**
      * get time in nano sec for the given clock
      * if clock_name is empty it will return the time of the current getMainClockName
-     * 
-     * @param clock_name name of the clock to retrieve the current time from
+     *
+     * @param[in] clock_name name of the clock to retrieve the current time from
      * @return value of the time in nanosec resolution
      * @retval -1 if the clock does not exist
      */
@@ -86,7 +84,7 @@ public:
      * get the type in for the given clock
      * if clock_name is empty it will return the type of the current getMainClockName
      *
-     * @param clock_name name of the clock to retrieve the current type from
+     * @param[in] clock_name name of the clock to retrieve the current type from
      * @return value of the type
      * @retval ClockType::invalid if the clock does not exist
      */

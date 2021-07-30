@@ -1,28 +1,28 @@
 /**
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
 #pragma once
 #include <string>
 
 #include <fep3/components/service_bus/rpc/fep_rpc.h>
-#include <fep3/base/streamtype/default_streamtype.h>
+#include <fep3/base/stream_type/default_stream_type.h>
 //this will be installed !!
 #include "rpc_services/data_registry/data_registry_rpc_intf.h"
 #include <fep_system_stubs/data_registry_proxy_stub.h>
@@ -77,31 +77,34 @@ public:
             return std::vector<std::string>();
         }
     }
-    StreamType getStreamType(const std::string& signal_name) const override
+
+    std::shared_ptr<fep3::arya::IStreamType> getStreamType(const std::string& signal_name) const override
     {
-        try
-        {
+        try {
             auto stream_type_return = GetStub().getStreamType(signal_name);
             auto meta_typename = stream_type_return["meta_type"].asString();
             auto properties = stream_type_return["properties"];
             auto names = a_util::strings::split(properties["names"].asString(), ",");
-            auto values = a_util::strings::split(properties["names"].asString(), ",");
+            auto values = a_util::strings::split(properties["values"].asString(), ",", true);
             auto types = a_util::strings::split(properties["types"].asString(), ",");
 
-            StreamMetaType meta_type(meta_typename);
-            StreamType stream_type_created(meta_type);
+            base::StreamMetaType meta_type(meta_typename);
+            auto stream_type_created = std::make_shared<base::StreamType>(meta_type);
             auto current_name = names.begin();
             auto current_value = values.begin();
             auto current_type = types.begin();
             while (current_name != names.end() && current_value != values.end() && current_type != types.end())
             {
-                stream_type_created.setProperty(*current_name, *current_value, *current_type);
+                stream_type_created->setProperty(*current_name, *current_value, *current_type);
+                current_name++;
+                current_value++;
+                current_type++;
             }
             return stream_type_created;
         }
         catch (...)
         {
-            return StreamTypeRaw();
+            return nullptr;
         }
     }
 

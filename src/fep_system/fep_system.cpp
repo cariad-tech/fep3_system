@@ -1,22 +1,22 @@
 /**
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
 #include <fep_system/fep_system.h>
 #include <a_util/system/system.h>
@@ -28,11 +28,13 @@
 #include <thread>
 #include <algorithm>
 #include <iterator>
+#include <functional>
 
 #include <fep3/components/clock/clock_service_intf.h>
 #include <fep3/components/clock_sync/clock_sync_service_intf.h>
 #include <fep3/components/scheduler/scheduler_service_intf.h>
 #include <fep3/base/properties/property_type.h>
+#include <fep3/base/properties/properties.h>
 
 using namespace a_util::strings;
 namespace
@@ -93,7 +95,7 @@ namespace fep3
         }
 
         std::vector<std::string> mapToStringVec() const
-        { 
+        {
             std::vector<std::string> participants;
             for (const auto& p : _participants)
             {
@@ -174,7 +176,7 @@ namespace fep3
         {
             if (_participants.empty())
             {
-                _logger->log(logging::Severity::warning, "",
+                _logger->log(LoggerSeverity::warning, "",
                     _system_name, "No participants within the current system");
                 return;
             }
@@ -208,13 +210,13 @@ namespace fep3
             {
                 FEP3_SYSTEM_LOG_AND_THROW(
                     _logger,
-                    logging::Severity::fatal,
+                    LoggerSeverity::fatal,
                     "",
                     _system_name,
                     error_message);
             }
 
-            _logger->log(logging::Severity::info, "",
+            _logger->log(LoggerSeverity::info, "",
                 _system_name, "system " + logging_info + " successfully");
         }
 
@@ -225,7 +227,7 @@ namespace fep3
         {
             if (_participants.empty())
             {
-                _logger->log(logging::Severity::warning, "",
+                _logger->log(LoggerSeverity::warning, "",
                     _system_name, "No participants within the current system");
                 return;
             }
@@ -259,16 +261,16 @@ namespace fep3
             {
                 FEP3_SYSTEM_LOG_AND_THROW(
                     _logger,
-                    logging::Severity::fatal,
+                    LoggerSeverity::fatal,
                     "",
                     _system_name,
                     error_message);
             }
 
-            _logger->log(logging::Severity::info, "",
+            _logger->log(LoggerSeverity::info, "",
                 _system_name, "system " + logging_info + " successfully");
         }
-        
+
 
         void setSystemState(System::AggregatedState state, std::chrono::milliseconds timeout)
         {
@@ -276,7 +278,7 @@ namespace fep3
                 || state == System::AggregatedState::undefined)
             {
                 FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    logging::Severity::error,
+                    LoggerSeverity::error,
                     "",
                     getName(),
                     "Invalid setSystemState call at system " + getName());
@@ -285,7 +287,7 @@ namespace fep3
             if (currentState._state == System::AggregatedState::unreachable)
             {
                 FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    logging::Severity::error,
+                    LoggerSeverity::error,
                     "",
                     getName(),
                     "At least one participant is unreachable, can not set homogenous state of the system " + getName());
@@ -293,7 +295,7 @@ namespace fep3
             else if (currentState._state == System::AggregatedState::undefined)
             {
                 FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    logging::Severity::error,
+                    LoggerSeverity::error,
                     "",
                     getName(),
                     "No participant has a statemachine, can not set homogenous state of the system " + getName());
@@ -307,7 +309,7 @@ namespace fep3
                 else
                 {
                     FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                        logging::Severity::error,
+                        LoggerSeverity::error,
                         "",
                         getName(),
                         "No homogenous state of the participants, setSystemState is not possible at system " + getName());
@@ -373,9 +375,9 @@ namespace fep3
 
         void load(std::chrono::milliseconds timeout )
         {
-            reverse_state_change(timeout, "loaded", false, 
+            reverse_state_change(timeout, "loaded", false,
                 [&](RPCComponent<rpc::IRPCParticipantStateMachine>& state_machine)
-                { 
+                {
                     if (state_machine)
                     {
                         state_machine->load();
@@ -430,7 +432,7 @@ namespace fep3
                 }
             });
         }
-        
+
         void pause(std::chrono::milliseconds timeout )
         {
             reverse_state_change(timeout, "paused", false,
@@ -458,7 +460,7 @@ namespace fep3
         {
             if (_participants.empty())
             {
-                _logger->log(logging::Severity::warning, "",
+                _logger->log(LoggerSeverity::warning, "",
                     _system_name + ".system", "No participants within the current system");
                 return;
             }
@@ -466,6 +468,7 @@ namespace fep3
             //shutdown has no prio
             for (auto& part : _participants)
             {
+                part.deregisterLogging();
                 auto state_machine = part.getRPCComponentProxyByIID<rpc::IRPCParticipantStateMachine>();
                 if (state_machine)
                 {
@@ -483,12 +486,12 @@ namespace fep3
             {
                 FEP3_SYSTEM_LOG_AND_THROW(
                     _logger,
-                    logging::Severity::fatal,
+                    LoggerSeverity::fatal,
                     "",
                     _system_name,
                     error_message);
             }
-            _logger->log(logging::Severity::info, "",
+            _logger->log(LoggerSeverity::info, "",
                 _system_name, "system shutdowned successfully");
         }
 
@@ -504,11 +507,11 @@ namespace fep3
 
         typedef std::map<std::string, rpc::arya::IRPCParticipantStateMachine::State> PartStates;
         //system state is aggregated
-        //timeout can be only used if the RPC will 
+        //timeout can be only used if the RPC will
         // support the changing of it or use for every single Request
         PartStates getParticipantStates(std::chrono::milliseconds )
         {
-            
+
             PartStates states;
             for (auto part : _participants)
             {
@@ -530,7 +533,7 @@ namespace fep3
                     }
                     else
                     {
-                        //the participant has no state machine, this is ok 
+                        //the participant has no state machine, this is ok
                         //... i.e. a recorder will have no states and a signal listener tool will have no states
                         states[part.getName()] = { rpc::arya::IRPCParticipantStateMachine::State::unreachable };
                     }
@@ -567,11 +570,11 @@ namespace fep3
                         homogeneous_value = false;
                     }
                 }
-                //this is to check if this loop was already entered before we change 
+                //this is to check if this loop was already entered before we change
                 first_set = true;
             }
             //no participant has a statemachine, then we are also undefined
-            if (!first_set) 
+            if (!first_set)
             {
                 return { rpc::arya::IRPCParticipantStateMachine::State::undefined };
             }
@@ -589,7 +592,18 @@ namespace fep3
 
         void registerMonitoring(IEventMonitor* monitor)
         {
+            // register first in case a warning has to be logged
             _logger->registerMonitor(monitor);
+
+            for (const auto& participant : _participants)
+            {
+                if (!participant.loggingRegistered())
+                {
+                    _logger->log(LoggerSeverity::warning, "",
+                    _system_name,
+                    a_util::strings::format("Participant %s has no registered logging interface.", participant.getName().c_str()));
+                }
+            }
         }
 
         void releaseMonitoring()
@@ -597,7 +611,7 @@ namespace fep3
             _logger->releaseMonitor();
         }
 
-        void setSeverityLevel(logging::Severity level)
+        void setSeverityLevel(LoggerSeverity level)
         {
             _logger->setSeverityLevel(level);
         }
@@ -613,7 +627,7 @@ namespace fep3
             if (part_found)
             {
                 FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    logging::Severity::fatal,
+                    LoggerSeverity::fatal,
                     "",
                     _system_name,
                     "Try to add a participant with name "
@@ -623,7 +637,7 @@ namespace fep3
                 participant_url,
                 _system_name,
                 _system_discovery_url,
-                *_logger.get(),
+                _logger,
                 PARTICIPANT_DEFAULT_TIMEOUT));
         }
 
@@ -657,7 +671,7 @@ namespace fep3
             if (throw_if_not_found)
             {
                 FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    logging::Severity::fatal,
+                    LoggerSeverity::fatal,
                     "",
                     _system_name,
                     "No Participant with the name " + participant_name + " found");
@@ -681,27 +695,27 @@ namespace fep3
             auto part = getParticipant(participant, false);
             if (part)
             {
-                
+
                 auto config_rpc_client = part.getRPCComponentProxyByIID<fep3::rpc::IRPCConfiguration>();
                 auto props = config_rpc_client->getProperties(node);
                 if (!props)
                 {
-                    throw std::runtime_error(format("access to properties node %s not possible", node));
+                    throw std::runtime_error(format("access to properties node %s not possible", node.c_str()));
                 }
 
                 if (!props->setProperty(property_normalized, value, type))
-                {                           
+                {
                     const auto message = format("property %s could not be set for the following participant: %s"
                         , property_normalized.c_str()
                         , part.getName().c_str());
 
                     throw std::runtime_error(message);
-                }    
+                }
             }
             else
             {
                 FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    logging::Severity::fatal,
+                    LoggerSeverity::fatal,
                     "",
                     _system_name,
                     format("participant %s within system %s not found to configure %s",
@@ -716,7 +730,7 @@ namespace fep3
             const std::string& value,
             const std::string& type,
             const std::string& except_participant = std::string(),
-			const bool throw_on_failure = true) const
+            const bool throw_on_failure = true) const
         {
             const auto property_normalized = replaceDotsWithSlashes(property_name);
             auto failing_participants = std::vector<std::string>();
@@ -731,62 +745,44 @@ namespace fep3
                     }
                 }
 
-				try
-				{
-					auto config_rpc_client = participant.getRPCComponentProxyByIID<fep3::rpc::IRPCConfiguration>();
-					auto props = config_rpc_client->getProperties(node);
-					if (props)
-					{
-						const auto success = props->setProperty(property_normalized, value, type);
-						if (!success)
-						{
-							failing_participants.push_back(participant.getName());
-						}
-					}
-				}
-				catch (const std::exception& /*exception*/)
-				{
-					failing_participants.push_back(participant.getName());
-				}
+                try
+                {
+                    auto config_rpc_client = participant.getRPCComponentProxyByIID<fep3::rpc::IRPCConfiguration>();
+                    auto props = config_rpc_client->getProperties(node);
+                    if (props)
+                    {
+                        const auto success = props->setProperty(property_normalized, value, type);
+                        if (!success)
+                        {
+                            failing_participants.push_back(participant.getName());
+                        }
+                    }
+                }
+                catch (const std::exception& /*exception*/)
+                {
+                    failing_participants.push_back(participant.getName());
+                }
             }
 
             if (!failing_participants.empty())
             {
-				const auto participants = join(failing_participants, ", ");
-				const auto message = format("property %s could not be set for the following participants: %s"
-					, property_normalized.c_str()
-					, participants.c_str());
-            	
-            	if (throw_on_failure)
-            	{
-					throw std::runtime_error(message);
-            	}
-            	
-				FEP3_SYSTEM_LOG(_logger,
-					logging::Severity::warning,
-					"",
-					_system_name,
-					message);
+                const auto participants = join(failing_participants, ", ");
+                const auto message = format("property %s could not be set for the following participants: %s"
+                    , property_normalized.c_str()
+                    , participants.c_str());
+
+                if (throw_on_failure)
+                {
+                    throw std::runtime_error(message);
+                }
+
+                FEP3_SYSTEM_LOG(_logger,
+                    LoggerSeverity::warning,
+                    "",
+                    _system_name,
+                    message);
             }
         }
-
-		void setSystemProperty(const std::string& path,
-			const std::string& type,
-			const std::string& value) const
-		{
-			const auto path_normalized = replaceDotsWithSlashes(path);
-			auto split_path = split(path_normalized, std::string(1, '/'));
-			split_path.insert(split_path.begin(), "system");
-
-			const auto property_name = split_path.back();
-
-        	split_path.erase(split_path.end() - 1);
-        	
-			const auto node_path = join(split_path, "/");
-
-        	
-			setPropertyValueToAll(node_path, property_name, value, type, "", false);
-		}
 
         void configureTiming(const std::string& master_clock_name, const std::string& slave_clock_name,
             const std::string& scheduler, const std::string& master_element_id, const std::string& master_time_stepsize,
@@ -794,43 +790,43 @@ namespace fep3
         {
             setPropertyValueToAll("/",
                 FEP3_CLOCKSYNC_SERVICE_CONFIG_TIMING_MASTER,
-                master_element_id, fep3::PropertyType<std::string>::getTypeName());
+                master_element_id, fep3::base::PropertyType<std::string>::getTypeName());
             setPropertyValueToAll("/",
                 FEP3_SCHEDULER_SERVICE_SCHEDULER,
-                scheduler, fep3::PropertyType<std::string>::getTypeName());
+                scheduler, fep3::base::PropertyType<std::string>::getTypeName());
 
             if (!master_element_id.empty())
             {
                 setPropertyValueToAll("/",
                     FEP3_CLOCK_SERVICE_MAIN_CLOCK,
-                    slave_clock_name, fep3::PropertyType<std::string>::getTypeName(), master_element_id);
+                    slave_clock_name, fep3::base::PropertyType<std::string>::getTypeName(), master_element_id);
                 setPropertyValue(master_element_id,
                     "/", FEP3_CLOCK_SERVICE_MAIN_CLOCK,
-                    master_clock_name, fep3::PropertyType<std::string>::getTypeName());
+                    master_clock_name, fep3::base::PropertyType<std::string>::getTypeName());
                 if (!master_time_factor.empty())
                 {
-                    
+
                     setPropertyValue(master_element_id,
                         "/", FEP3_CLOCK_SERVICE_CLOCK_SIM_TIME_TIME_FACTOR,
-                        master_time_factor, fep3::PropertyType<double>::getTypeName());
+                        master_time_factor, fep3::base::PropertyType<double>::getTypeName());
                 }
                 if (!master_time_stepsize.empty())
                 {
-                    setPropertyValue(master_element_id, 
-                        "/", FEP3_CLOCK_SERVICE_CLOCK_SIM_TIME_CYCLE_TIME, 
-                        master_time_stepsize, fep3::PropertyType<int32_t>::getTypeName());
+                    setPropertyValue(master_element_id,
+                        "/", FEP3_CLOCK_SERVICE_CLOCK_SIM_TIME_STEP_SIZE,
+                        master_time_stepsize, fep3::base::PropertyType<int64_t>::getTypeName());
                 }
                 if (!slave_sync_cycle_time.empty())
                 {
                     setPropertyValueToAll("/",
                         FEP3_CLOCKSYNC_SERVICE_CONFIG_SLAVE_SYNC_CYCLE_TIME,
-                        slave_sync_cycle_time, fep3::PropertyType<int32_t>::getTypeName(), master_element_id);
+                        slave_sync_cycle_time, fep3::base::PropertyType<int64_t>::getTypeName(), master_element_id);
                 }
             }
             else
             {
                 setPropertyValueToAll("/",
-                    FEP3_CLOCK_SERVICE_MAIN_CLOCK, slave_clock_name, fep3::PropertyType<std::string>::getTypeName());
+                    FEP3_CLOCK_SERVICE_MAIN_CLOCK, slave_clock_name, fep3::base::PropertyType<std::string>::getTypeName());
             }
         }
 
@@ -867,10 +863,10 @@ namespace fep3
             for (const ParticipantProxy& participant : getParticipants())
             {
                 auto iterator_success = timing_properties.emplace(participant.getName(),
-                    std::unique_ptr<IProperties>(new Properties<IProperties>()));
+                    std::unique_ptr<IProperties>(new base::Properties<IProperties>()));
                 if (!iterator_success.second)
                 {
-                    FEP3_SYSTEM_LOG_AND_THROW(_logger, logging::Severity::fatal, "", _system_name,
+                    FEP3_SYSTEM_LOG_AND_THROW(_logger, LoggerSeverity::fatal, "", _system_name,
                         "Multiple Participants with the name " + participant.getName() + " found");
                 }
                 IProperties& participant_properties = *iterator_success.first->second;
@@ -897,7 +893,7 @@ namespace fep3
                         if (clockservice_props)
                         {
                             set_if_present(*clockservice_props, FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY);
-                            set_if_present(*clockservice_props, FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY);
+                            set_if_present(*clockservice_props, FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY);
                             set_if_present(*clockservice_props, FEP3_TIME_UPDATE_TIMEOUT_PROPERTY);
                         }
                         set_if_present(*clocksync_props, FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY);
@@ -1018,7 +1014,7 @@ namespace fep3
     {
         _impl->shutdown(timeout);
     }
-    
+
 
     void System::add(const std::string& participant, const std::string& participant_url)
     {
@@ -1094,23 +1090,16 @@ namespace fep3
         _impl->releaseMonitoring();
     }
 
-    void System::setSeverityLevel(logging::Severity severity_level)
+    void System::setSeverityLevel(LoggerSeverity severity_level)
     {
         _impl->setSeverityLevel(severity_level);
     }
-
-	void System::setSystemProperty(const std::string& path,
-		const std::string& type,
-		const std::string& value) const
-	{
-		_impl->setSystemProperty(path, type, value);
-	}
 
     void System::configureTiming(const std::string& master_clock_name, const std::string& slave_clock_name,
         const std::string& scheduler, const std::string& master_element_id, const std::string& master_time_stepsize,
         const std::string& master_time_factor, const std::string& slave_sync_cycle_time) const
     {
-        _impl->configureTiming(master_clock_name, slave_clock_name, scheduler, master_element_id, 
+        _impl->configureTiming(master_clock_name, slave_clock_name, scheduler, master_element_id,
             master_time_stepsize, master_time_factor, slave_sync_cycle_time);
     }
 
@@ -1126,7 +1115,7 @@ namespace fep3
 
     void System::configureTiming3NoMaster() const
     {
-        _impl->configureTiming("", FEP3_CLOCK_LOCAL_SYSTEM_REAL_TIME, 
+        _impl->configureTiming("", FEP3_CLOCK_LOCAL_SYSTEM_REAL_TIME,
             FEP3_SCHEDULER_CLOCK_BASED, "", "", "", "");
     }
 
@@ -1161,7 +1150,7 @@ namespace fep3
     }
 
 /**************************************************************
-* discoveries 
+* discoveries
 ***************************************************************/
 
 
@@ -1169,7 +1158,7 @@ namespace fep3
     {
         return discoverSystemByURL(name, arya::IServiceBusConnection::ISystemAccess::_use_default_url, timeout);
     }
-    
+
     System discoverSystemByURL(std::string name, std::string discover_url, std::chrono::milliseconds timeout)
     {
         // default discover is actually DDS with domain 0
@@ -1195,13 +1184,13 @@ namespace fep3
         throw std::runtime_error("can not create a service bus connection to system '"
             + name + "' at url '" + discover_url + "'");
     }
-  
+
     std::vector<System> discoverAllSystems(std::chrono::milliseconds timeout /*= FEP_SYSTEM_DISCOVER_TIMEOUT*/)
     {
         return discoverAllSystemsByURL(arya::IServiceBusConnection::ISystemAccess::_use_default_url ,timeout);
     }
 
-   
+
     std::vector<System> discoverAllSystemsByURL(std::string discover_url,
         std::chrono::milliseconds timeout /*= FEP_SYSTEM_DISCOVER_TIMEOUT*/)
     {
@@ -1211,7 +1200,6 @@ namespace fep3
             discover_url);
         if (my_discovery_bus)
         {
-            //we check if that system access already exists
             //we check if that system access already exists
             auto sys_access = my_discovery_bus->getSystemAccess(arya::IServiceBusConnection::ISystemAccess::_discover_all_systems);
             if (!sys_access)
@@ -1240,7 +1228,7 @@ namespace fep3
                 }
                 else
                 {
-                    //found invalid id / do not know if i inform about that 
+                    //found invalid id / do not know if i inform about that
                 }
             }
             std::vector<System> result_vector_system;
@@ -1254,5 +1242,154 @@ namespace fep3
         throw std::runtime_error("can not create a service bus connection to discover all systems at url ''"
             + discover_url + "'");
     }
-    
+
+namespace experimental
+{
+
+    struct System::Implementation
+    {
+    public:
+        Implementation() = default;
+        Implementation(const Implementation& other) = delete;
+        Implementation(Implementation&& other) = delete;
+        Implementation& operator=(const Implementation& other) = delete;
+        Implementation& operator=(Implementation&& other) = delete;
+        ~Implementation() = default;
+
+        experimental::HealthState getHealth(ParticipantProxy participant_proxy) const
+        {
+            const auto health_service = participant_proxy.getRPCComponentProxyByIID<experimental::IRPCHealthService>();
+            if (!health_service)
+            {
+                return HealthState::unknown;
+            }
+
+            return health_service->getHealth();
+        }
+
+        typedef std::map<std::string, experimental::HealthState> PartHealthStates;
+        PartHealthStates getParticipantHealthStates(std::vector<ParticipantProxy> participant_proxies) const
+        {
+            PartHealthStates participant_health_states{};
+
+            for (const auto& participant : participant_proxies)
+            {
+                const auto health_service =
+                    participant.getRPCComponentProxyByIID<experimental::IRPCHealthService>();
+                if (!health_service)
+                {
+                    participant_health_states[participant.getName()] = experimental::HealthState::unknown;
+                }
+                else
+                {
+                    participant_health_states[participant.getName()] = health_service->getHealth();
+                }
+            }
+
+            return participant_health_states;
+        }
+
+        static experimental::SystemHealthState getAggregatedHealthState(const PartHealthStates& states)
+        {
+            //we begin at the lowest value
+            experimental::SystemAggregatedHealthState aggregated_health_state = experimental::SystemAggregatedHealthState::ok;
+            //we have a look if at least one of it is set
+            bool first_set = false;
+            bool homogeneous_value = true;
+            for (const auto& item : states)
+            {
+                experimental::HealthState current_health_state = item.second;
+                //we were at least one time in this loop
+                if (current_health_state != experimental::SystemAggregatedHealthState::unknown)
+                {
+                    if (current_health_state > aggregated_health_state)
+                    {
+                        if (first_set)
+                        {
+                            //is not homogenous because some of the already checked states has a lower value
+                            homogeneous_value = false;
+                        }
+                        aggregated_health_state = current_health_state;
+                    }
+                    if (current_health_state < aggregated_health_state)
+                    {
+                        //is not homogenous because one of the already checked states has a higher value
+                        homogeneous_value = false;
+                    }
+                }
+                //this is to check if this loop was already entered before we change
+                first_set = true;
+            }
+            //no participant has a health state, then we are also unknown
+            if (!first_set)
+            {
+                return { true, experimental::HealthState::unknown };
+            }
+            else
+            {
+                return { homogeneous_value , aggregated_health_state };
+            }
+        }
+
+        experimental::SystemHealthState getSystemHealth(std::vector<ParticipantProxy> participant_proxies) const
+        {
+            return getAggregatedHealthState(getParticipantHealthStates(participant_proxies));
+        }
+
+        fep3::Result resetHealth(ParticipantProxy participant_proxy, const std::string& message)
+        {
+            const auto health_service = participant_proxy.getRPCComponentProxyByIID<experimental::IRPCHealthService>();
+            if (!health_service)
+            {
+                return fep3::Result{ ERR_NOT_FOUND,
+                            a_util::strings::format("Health service of participant '%s' is inaccessible.", participant_proxy.getName().c_str()).c_str(),
+                            0,
+                            "",
+                            ""};
+            }
+
+            return health_service->resetHealth(message);
+        }
+    };
+
+    System::System()
+        : fep3::System()
+        ,  _impl(std::make_unique<Implementation>())
+    {
+    }
+
+    System::System(const std::string& system_name)
+        : fep3::System(system_name)
+        ,  _impl(std::make_unique<Implementation>())
+    {
+    }
+
+    System::System(const std::string& system_name,
+                   const std::string& system_discovery_url)
+        : fep3::System(system_name, system_discovery_url)
+        ,  _impl(std::make_unique<Implementation>())
+    {
+    }
+
+    System::~System()
+    {
+    }
+
+    experimental::HealthState System::getHealth(const std::string& participant_name) const
+    {
+        return _impl->getHealth(getParticipant(participant_name));
+    }
+
+    experimental::SystemHealthState System::getSystemHealth() const
+    {
+        return _impl->getSystemHealth(getParticipants());
+    }
+
+    fep3::Result System::resetHealth(const std::string& participant_name, const std::string& message)
+    {
+        return _impl->resetHealth(getParticipant(participant_name), message);
+    }
+
+}
+
 }

@@ -1,24 +1,22 @@
 /**
- * Implementation of the tester for the FEP Data Sample (locking)
- *
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
  /**
  * Test Case:   TestSystemLibrary
@@ -38,6 +36,26 @@
 #include <a_util/logging.h>
 #include <a_util/process.h>
 
+namespace
+{
+    bool logEntriesContainString(const std::vector<std::string> &strings_to_check, const std::vector<std::string> &expected_sub_string)
+    {
+        for (const std::string &log_message : strings_to_check)
+        {
+            if (!std::any_of(expected_sub_string.begin(), expected_sub_string.end(),
+                [&log_message](const std::string &expected)
+                {
+                    return log_message.find(expected) != std::string::npos;
+                })
+                )
+                {
+                    return false;
+                }
+        }
+
+        return true;
+    }
+}
 
 struct TestEventMonLog : public fep3::IEventMonitor
 {
@@ -49,29 +67,31 @@ struct TestEventMonLog : public fep3::IEventMonitor
     {
     }
     void onLog(std::chrono::milliseconds /*log_time*/,
-        fep3::logging::Severity severity_level,
-        const std::string& participant_name,
-        const std::string& logger_name,
-        const std::string& message) override
+               fep3::LoggerSeverity severity_level,
+               const std::string &participant_name,
+               const std::string &logger_name,
+               const std::string &message) override
     {
-        if (logger_name == "Testelement.element")
+        if (_logEverything ||
+            (logger_name == "Testelement.element"))
         {
             _messages[severity_level].push_back(logger_name + "---" + participant_name + "---" + message);
             _logcount++;
         }
     }
-    std::map<fep3::logging::Severity, std::vector<std::string>> _messages;
+    std::map<fep3::LoggerSeverity, std::vector<std::string>> _messages;
     std::atomic<int32_t> _logcount;
+    bool _logEverything = false;
 };
 
 TEST(SystemLibrary, TestParticpantInfo)
 {
     auto sys_name = makePlatformDepName("test_system");
-    const auto participant_names = std::vector<std::string>{ "test_participant1", "test_participant2" };
+    const auto participant_names = std::vector<std::string>{"test_participant1", "test_participant2"};
     const TestParticipants test_parts = createTestParticipants(participant_names, sys_name);
 
     fep3::System my_system(sys_name);
-    for (const auto& part : test_parts)
+    for (const auto &part : test_parts)
     {
         my_system.add(part.first);
     }
@@ -88,32 +108,42 @@ TEST(SystemLibrary, TestParticpantInfo)
     }
     my_system.unregisterMonitoring(test_log);
 
-    EXPECT_EQ(test_log._messages[fep3::logging::Severity::debug].size(), 0);
-    EXPECT_EQ(test_log._messages[fep3::logging::Severity::info].size(), 4);
-    EXPECT_EQ(test_log._messages[fep3::logging::Severity::warning].size(), 4);
-    EXPECT_EQ(test_log._messages[fep3::logging::Severity::error].size(), 4);
-    EXPECT_EQ(test_log._messages[fep3::logging::Severity::fatal].size(), 4);
+    EXPECT_EQ(test_log._messages[fep3::LoggerSeverity::debug].size(), 0);
+    EXPECT_EQ(test_log._messages[fep3::LoggerSeverity::info].size(), 4);
+    EXPECT_EQ(test_log._messages[fep3::LoggerSeverity::warning].size(), 4);
+    EXPECT_EQ(test_log._messages[fep3::LoggerSeverity::error].size(), 4);
+    EXPECT_EQ(test_log._messages[fep3::LoggerSeverity::fatal].size(), 4);
 
-    for (const auto& content_log : test_log._messages[fep3::logging::Severity::info])
-    {
-        EXPECT_TRUE(content_log.find("initializing") != std::string::npos ||
-            content_log.find("loading") != std::string::npos || 
-            content_log.find(sys_name) != std::string::npos);
-    }
-    for (const auto& content_log : test_log._messages[fep3::logging::Severity::warning])
-    {
-        EXPECT_TRUE(content_log.find("initializing") != std::string::npos ||
-            content_log.find("loading") != std::string::npos);
-    }
-    for (const auto& content_log : test_log._messages[fep3::logging::Severity::error])
-    {
-        EXPECT_TRUE(content_log.find("initializing") != std::string::npos ||
-            content_log.find("loading") != std::string::npos);
-    }
-    for (const auto& content_log : test_log._messages[fep3::logging::Severity::fatal])
-    {
-        EXPECT_TRUE(content_log.find("initializing") != std::string::npos ||
-            content_log.find("loading") != std::string::npos);
-    }
+    std::vector<std::string> expectedLogContent = {"initializing", "loading"};
+
+    EXPECT_TRUE(logEntriesContainString(test_log._messages[fep3::LoggerSeverity::warning], expectedLogContent));
+    EXPECT_TRUE(logEntriesContainString(test_log._messages[fep3::LoggerSeverity::error], expectedLogContent));
+    EXPECT_TRUE(logEntriesContainString(test_log._messages[fep3::LoggerSeverity::fatal], expectedLogContent));
+
+    expectedLogContent.push_back(sys_name);
+    logEntriesContainString(test_log._messages[fep3::LoggerSeverity::info], expectedLogContent);
 }
 
+/* Tests the case that the Event Monitoring is registered before the participant
+    is completely ready. See FEPSDK-2982 and SUP-4001
+*/
+TEST(SystemLibrary, TestEaryEventMonitorRegister)
+{
+    auto sys_name = makePlatformDepName("test_system");
+    const std::string not_ready_participant{"test_participant1"};
+
+    fep3::System my_system(sys_name);
+    my_system.add(not_ready_participant);
+
+    ASSERT_FALSE(my_system.getParticipant(not_ready_participant).loggingRegistered());
+
+    TestEventMonLog test_log;
+    test_log._logEverything = true;
+    my_system.registerMonitoring(test_log);
+
+    EXPECT_EQ(test_log._messages[fep3::LoggerSeverity::warning].size(), 1);
+
+    std::vector<std::string> expected_log_content = {"Participant test_participant1 has no registered logging interface"};
+
+    ASSERT_TRUE(logEntriesContainString(test_log._messages[fep3::LoggerSeverity::warning], expected_log_content));
+}

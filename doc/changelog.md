@@ -1,5 +1,5 @@
-<!---
-  Copyright @ 2020 Audi AG. All rights reserved.
+<!--
+  Copyright @ 2021 VW Group. All rights reserved.
   
       This Source Code Form is subject to the terms of the Mozilla
       Public License, v. 2.0. If a copy of the MPL was not distributed
@@ -10,39 +10,36 @@
   relevant directory) where a recipient would be likely to look for such a notice.
   
   You may add additional accurate notices of copyright ownership.
+  
   -->
-# FEP SDK System Library Changelog {#fep_sdk_system_change_log}
+
+# FEP SDK System Library Changelog
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0) and this project adheres to [Semantic Versioning](https://semver.org/lang/en).
 
 ## [Unreleased]
 
-Release Notes - FEP System Library - Version 2.6.0
+## [3.0.1] 2021
 
-## [2.6.0] - Jan-2020
+### Changes
+- Based on FEP SDK Participant 3.0.1
 
-### Bug
-    * [FEPSDK-2017] - Setting a property which does not exist leads to a participant crash
-    * [FEPSDK-2058] - It is not possible to set timing property
-    * [FEPSDK-2059] - Syntax of Property Values to set and get is not clearly defined, only slahes '/' are allowed! 
+## [3.0.0] 2021-03-05
 
-### Change
-    * [FEPSDK-1920] - Copy or move the configureTiming and the configureSystemProperties functionality from controller lib to system lib
-    * [FEPSDK-1984] - Use fep3::System instead of std::unique_ptr<fep3::System> for connectSystem() as return value
-    * [FEPSDK-2049] - Add hint within the documentation of RPC Data Registry Service when signals can be obtained
-    * [FEPSDK-2051] - if setting system and system timing properties fails a std::runtime_error will be thrown
-
-Release Notes - FEP System Library - Version 2.5.1
-
-## [2.5.1] - Oct-2019
-
-### Bug
-    * [FEPSDK-1320] - Wrong include in data_registry_rpc_intf.h
-
-### Change
-     * [FEPSDK-1326] - Create own FEP System Library (Repo + Package + Jobs)
-                       FEP System Library is now a separated delivery package fep_sdk_system/2.5.1@aev25/*
-     * [FEPSDK-1087] - [PropertyTree] Add To System Lib - Rework public interface to IRPCPropertyTree 
-     * [FEPSDK-1321] - get rid of SystemLogger in public API
-     * [FEPSDK-1327] - Move FEP SDK - System Code to the Git repo created
+### Changes
+- FEPSDK-2857 Set pause mode as unsupported
+- FEPSDK-2757 Improve test for deterministic simulation
+- FEPSDK-2664 Apply user documentation guidelines
+- FEPSDK-2585 Prepare FEP3 SDK code to be distributed as OSS
+- FEPSDK-2561 [FEP3] Use the new profiles [gcc5, v141] as base for the delivery packages
+- FEPSDK-2491 Correct inconsistency in file names covering "stream types"
+- FEPSDK-2363 Rework all enumerations to the guideline and unify them
+- FEPSDK-2321 Integrate RPC Logging Service to FEP System API 3
+- FEPSDK-2320 Integrate RPC Configuration Service to FEP System API 3
+- FEPSDK-2311 discover*System* functions' documentation are the same in header file
+- FEPSDK-2301 Create initial documentation
+- FEPSDK-2133 Check and Change FEP_ defines to FEP3_ defines
+- FEPSDK-2056 getCurrentSystemTiming() from fep::System in FEP System Library 3
+- FEPSDK-2055 Adapt system api to use FEP 3
+- FEPSDK-1340 [POC] Design a Health Service for FEP Participant Library

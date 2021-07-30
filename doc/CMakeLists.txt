@@ -1,5 +1,5 @@
 #
-# Copyright @ 2020 Audi AG. All rights reserved.
+# Copyright @ 2021 VW Group. All rights reserved.
 # 
 #     This Source Code Form is subject to the terms of the Mozilla
 #     Public License, v. 2.0. If a copy of the MPL was not distributed
@@ -10,9 +10,8 @@
 # relevant directory) where a recipient would be likely to look for such a notice.
 # 
 # You may add additional accurate notices of copyright ownership.
+# 
 #
-##################################################################
-
 set(DOXYGEN_INPUTS
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
@@ -20,9 +19,9 @@ set(DOXYGEN_INPUTS
 if(DOXYGEN_DISABLE_WARNINGS_AS_ERRORS)
     set(DOXYGEN_WARNINGS_AS_ERRORS "NO")
     message(WARNING "DOXYGEN_WARNINGS_AS_ERRORS is deactivated")
-else(DOXYGEN_DISABLE_WARNINGS_AS_ERRORS)  
+else(DOXYGEN_DISABLE_WARNINGS_AS_ERRORS)
     set(DOXYGEN_WARNINGS_AS_ERRORS "YES")
-endif(DOXYGEN_DISABLE_WARNINGS_AS_ERRORS)  
+endif(DOXYGEN_DISABLE_WARNINGS_AS_ERRORS)
 
 set(DOXYGEN_EXCLUDES "\" \"")
 
@@ -48,20 +47,26 @@ configure_file(input/doxygen.cfg.in ${DOC_BUILD_DIR}/doxygen.cfg)
 set(DOCUMENTATION_GENERATED_FLAG_FILE ${CMAKE_CURRENT_BINARY_DIR}/doc_generated)
 add_custom_target(DOC_DEV_${PROJECT_NAME} ALL DEPENDS ${DOCUMENTATION_GENERATED_FLAG_FILE})
 
-add_custom_command(OUTPUT ${DOCUMENTATION_GENERATED_FLAG_FILE}  
-    COMMAND ${DOXYGEN_ROOT}/bin/doxygen ${DOC_BUILD_DIR}/doxygen.cfg  
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/input/ ${DOC_BUILD_DIR}   
+add_custom_command(OUTPUT ${DOCUMENTATION_GENERATED_FLAG_FILE}
+    COMMAND ${DOXYGEN_ROOT}/bin/doxygen ${DOC_BUILD_DIR}/doxygen.cfg
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/input/ ${DOC_BUILD_DIR}
     # -W -n append to sphinx build in order to activate strict building (no warnings at all are tolerated)
     COMMAND ${SPHINX_BUILD_EXE} -W -b html ${DOC_BUILD_DIR} ${CMAKE_CURRENT_BINARY_DIR}/output/sphinx_html
     # And mark that documentation as created
     COMMAND ${CMAKE_COMMAND} -E touch ${DOCUMENTATION_GENERATED_FLAG_FILE}
-    WORKING_DIRECTORY .  
+    WORKING_DIRECTORY .
     COMMENT "Build html documentation using not yet sphinx, but doxygen only for now"
    )
 
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/output/sphinx_html/
-        DESTINATION doc/html      
+        DESTINATION doc/html
 )
+
+install(FILES changelog.md DESTINATION doc)
+install(DIRECTORY license
+        DESTINATION doc
+)
+
 
 
 set_target_properties(DOC_DEV_${PROJECT_NAME} PROPERTIES FOLDER process/doc)

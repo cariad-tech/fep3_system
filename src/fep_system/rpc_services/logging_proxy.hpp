@@ -1,22 +1,22 @@
 /**
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
 #pragma once
 
@@ -36,7 +36,7 @@ namespace rpc
 namespace arya
 {
 
-using LoggingServiceClientProxy 
+using LoggingServiceClientProxy
     = RPCServiceClientProxy< rpc_proxy_stub::RPCLoggingServiceProxy,
                              IRPCLoggingService >;
 
@@ -65,7 +65,7 @@ public:
     }
 
     bool setLoggerFilter(const std::string& logger_name,
-        const logging::LoggerFilter& configuration) const override
+        const LoggerFilter& configuration) const override
     {
         try
         {
@@ -75,7 +75,7 @@ public:
             if (retval)
             {
                 _logger.log(
-                    logging::Severity::error,
+                    LoggerSeverity::error,
                     _participant_name,
                     "logging_service",
                     std::string("Setting logger filter failed with error code: ") + std::to_string(retval));
@@ -85,7 +85,7 @@ public:
         catch (...)
         {
             _logger.log(
-                logging::Severity::fatal,
+                LoggerSeverity::fatal,
                 _participant_name,
                 "logging_service",
                 std::string("Setting logger filter failed: RPC communication failed"));
@@ -95,27 +95,27 @@ public:
     }
 
 
-    logging::LoggerFilter getLoggerFilter(const std::string& logger_name) const
+    LoggerFilter getLoggerFilter(const std::string& logger_name) const
     {
         try
         {
             auto retval = GetStub().getLoggerFilter(logger_name);
-            logging::LoggerFilter ret_struct;
+            LoggerFilter ret_struct;
             ret_struct._enabled_logging_sinks = a_util::strings::split(retval["enable_sinks"].asString(), ",");
-            ret_struct._severity = static_cast<logging::Severity>(retval["severity"].asInt());
+            ret_struct._severity = static_cast<LoggerSeverity>(retval["severity"].asInt());
             return ret_struct;
         }
         catch (...)
         {
             _logger.log(
-                logging::Severity::fatal,
+                LoggerSeverity::fatal,
                 _participant_name,
                 "logging_service",
                 std::string("getting logger filter failed: RPC communication failed"));
             return {};
         }
     }
-  
+
     std::vector<std::string> getLoggers() const override
     {
         try
@@ -126,7 +126,7 @@ public:
         catch (...)
         {
             _logger.log(
-                logging::Severity::fatal,
+                LoggerSeverity::fatal,
                 _participant_name,
                 "logging_service",
                 std::string("getting loggers failed: RPC communication failed"));
@@ -144,7 +144,7 @@ public:
         catch (...)
         {
             _logger.log(
-                logging::Severity::fatal,
+                LoggerSeverity::fatal,
                 _participant_name,
                 "logging_service",
                 std::string("getting sinks failed: RPC communication failed"));
@@ -152,7 +152,7 @@ public:
         }
     }
 
-    class RPCSinkProperties : 
+    class RPCSinkProperties :
         public LoggingServiceClient,
         public IProperties
     {
@@ -160,7 +160,7 @@ public:
 
         explicit RPCSinkProperties(const std::string& sink_name,
             const std::string& rpc_component_name,
-            const std::shared_ptr<IRPCRequester>& rpc) : 
+            const std::shared_ptr<IRPCRequester>& rpc) :
             LoggingServiceClient(rpc_component_name, rpc),
             _sink_name(sink_name)
         {
@@ -187,7 +187,7 @@ public:
                 return false;
             }
         }
-      
+
         std::string getProperty(const std::string& name) const
         {
             try
@@ -233,7 +233,7 @@ public:
             }
             return true;
         }
-        void copy_to(IProperties& properties) const
+        void copyTo(IProperties& properties) const
         {
             auto names = getPropertyNames();
             for (const auto& current_name : names)
@@ -265,7 +265,7 @@ public:
         std::string _sink_name;
     };
 
-  
+
     std::shared_ptr<IProperties> getProperties(const std::string& sink_name) const
     {
         return std::make_shared<RPCSinkProperties>(sink_name, _rpc_component_name, _rpc);
@@ -300,7 +300,7 @@ public:
     {
         try
         {
-            return GetStub().registerRPCLoggingSinkClient(url, "", static_cast<int>(logging::Severity::info));
+            return GetStub().registerRPCLoggingSinkClient(url, "", static_cast<int>(LoggerSeverity::info));
         }
         catch (...)
         {

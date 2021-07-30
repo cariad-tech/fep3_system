@@ -1,5 +1,5 @@
 #
-# Copyright @ 2020 Audi AG. All rights reserved.
+# Copyright @ 2021 VW Group. All rights reserved.
 # 
 #     This Source Code Form is subject to the terms of the Mozilla
 #     Public License, v. 2.0. If a copy of the MPL was not distributed
@@ -10,7 +10,8 @@
 # relevant directory) where a recipient would be likely to look for such a notice.
 # 
 # You may add additional accurate notices of copyright ownership.
-
+# 
+#
 # Using this to workaround MSCGEN bug in a_utils_add_doc
 function(fep_add_doc CONFIG OUTPUT_DIR)
     find_package(Doxygen REQUIRED)
@@ -34,11 +35,11 @@ function(fep_add_doc CONFIG OUTPUT_DIR)
     set(OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_DIR})
     set(NEW_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/doxygen.cfg)
     configure_file(${CONFIG} ${NEW_CONFIG})
-    
+
     ##Check optional parameters
     # May be overwritten in upcoming tests
     set(DOC_NAME DOC)
-    
+
     ##Go through all available parameters
     set(LOOPCOUNT 0)                            #Needed to access variables
     foreach(f ${ARGV})
@@ -52,7 +53,7 @@ function(fep_add_doc CONFIG OUTPUT_DIR)
             endif(ARGV${LOOPCOUNT})
         endif(TARGET_NAME STREQUAL ${f})
     endforeach()
-    
+
     # attach DOC target to ALL in release builds
     if(NOT ${CONAN_SETTINGS_BUILD_TYPE} STREQUAL "Debug")
         add_custom_target(${DOC_NAME} ALL ${DOXYGEN_EXECUTABLE} ${NEW_CONFIG}

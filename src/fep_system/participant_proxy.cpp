@@ -1,22 +1,22 @@
-/*
+/**
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
 #include <fep_system/participant_proxy.h>
 #include <private_participant_proxy.hpp>
@@ -32,7 +32,7 @@ ParticipantProxy::ParticipantProxy(const std::string& participant_name,
     const std::string& participant_url,
     const std::string& system_name,
     const std::string& system_discovery_url,
-    ISystemLogger& logger,
+    std::shared_ptr<ISystemLogger> logger,
     std::chrono::milliseconds default_timeout)
 {
     _impl.reset(new Implementation(participant_name,
@@ -124,5 +124,15 @@ bool ParticipantProxy::getRPCComponentProxyByIID(const std::string& component_ii
     return _impl->getRPCComponentProxyByIID(component_iid,
         proxy_ptr);
 }
+
+void ParticipantProxy::deregisterLogging()
+{
+    _impl->deregisterLogging();
 }
 
+bool ParticipantProxy::loggingRegistered() const
+{
+        return _impl->loggingRegistered();
+}
+
+}

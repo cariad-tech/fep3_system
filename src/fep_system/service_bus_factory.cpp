@@ -1,25 +1,27 @@
 /**
-* @file
-*
-* @copyright
-* @verbatim
-Copyright @ 2020 AUDI AG. All rights reserved.
+ * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-This Source Code Form is subject to the terms of the Mozilla
-Public License, v. 2.0. If a copy of the MPL was not distributed
-with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 If it is not possible or desirable to put the notice in a particular file, then
 You may include the notice in a location (such as a LICENSE file in a
 relevant directory) where a recipient would be likely to look for such a notice.
 
 You may add additional accurate notices of copyright ownership.
+
 @endverbatim
-*/
+ */
+
 #include "service_bus_factory.h"
 #include <fep3/plugin/base/fep3_calling_convention.h>
 #include <a_util/filesystem.h>
 #include <a_util/xml.h>
+#include <a_util/strings.h>
 
 namespace helper
 {
@@ -122,7 +124,7 @@ class SystemConfigFile
             a_util::xml::DOMElementList plugins;
             if (loaded_file.getRoot().findNodes("plugin", plugins))
             {
-                { //validate it 
+                { //validate it
 
                     for (const auto& comp_node : plugins)
                     {
@@ -237,7 +239,7 @@ void ServiceBusFactory::initialize()
         if (plugin_item._source_type == "cpp-plugin")
         {
             auto loaded_plugin = std::make_shared<plugin::cpp::HostPlugin>(plugin_item._source_file_reference);
-            std::shared_ptr<arya::ICPPPluginComponentFactory> factory = loaded_plugin->create<arya::ICPPPluginComponentFactory>(
+            std::shared_ptr<plugin::cpp::arya::ICPPPluginComponentFactory> factory = loaded_plugin->create<plugin::cpp::arya::ICPPPluginComponentFactory>(
                 SYMBOL_fep3_plugin_cpp_arya_getFactory);
             if (!factory)
             {
@@ -281,7 +283,7 @@ std::shared_ptr<arya::IServiceBusConnection> ServiceBusFactory::createOrGetServi
             }
         }
     }
-    
+
     //erase what is expired
     for (const auto& current_erase : erase_list)
     {

@@ -1,24 +1,22 @@
 /**
- * Implementation of the tester for the FEP Data Sample (locking)
- *
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
  /**
  * Test Case:   TestSystemLibrary
@@ -36,7 +34,8 @@
 #include <fep_system/fep_system.h>
 #include "participant_configuration_helper.hpp"
 #include "fep_test_common.h"
-#include <fep3/components/configuration/propertynode.h>
+#include <fep3/base/properties/propertynode.h>
+#include <fep3/base/properties/propertynode_helper.h>
 #include <fep_system/mock/event_monitor.h>
 #include "../../../../../function/utils/common/gtest_asserts.h"
 
@@ -59,11 +58,11 @@ TEST(ParticipantConfiguration, TestProxyConfigGetter)
     auto& part = parts["Participant1_configuration_test"];
     auto config_service = part->_part.getComponent<IConfigurationService>();
 
-    auto props = std::make_shared<NativePropertyNode>("deeper");
-    props->setChild(makeNativePropertyNode("bool_value", false));
-    props->setChild(makeNativePropertyNode("int_value", 1));
-    props->setChild(makeNativePropertyNode("double_value", double(0.1)));
-    props->setChild(makeNativePropertyNode("string_value", std::string("test_value")));
+    auto props = std::make_shared<base::NativePropertyNode>("deeper");
+    props->setChild(base::makeNativePropertyNode("bool_value", false));
+    props->setChild(base::makeNativePropertyNode("int_value", 1));
+    props->setChild(base::makeNativePropertyNode("double_value", double(0.1)));
+    props->setChild(base::makeNativePropertyNode("string_value", std::string("test_value")));
     config_service->registerNode(props);
 
     bool bool_value = true;
@@ -98,11 +97,11 @@ TEST(ParticipantConfiguration, TestProxyConfigSetter)
     auto& part = parts["Participant1_configuration_test"];
     auto config_service = part->_part.getComponent<IConfigurationService>();
 
-    auto props = std::make_shared<NativePropertyNode>("deeper");
-    props->setChild(makeNativePropertyNode("bool_value", false));
-    props->setChild(makeNativePropertyNode("int_value", 1));
-    props->setChild(makeNativePropertyNode("double_value", double(0.1)));
-    props->setChild(makeNativePropertyNode("string_value", std::string("test_value")));
+    auto props = std::make_shared<base::NativePropertyNode>("deeper");
+    props->setChild(base::makeNativePropertyNode("bool_value", false));
+    props->setChild(base::makeNativePropertyNode("int_value", 1));
+    props->setChild(base::makeNativePropertyNode("double_value", double(0.1)));
+    props->setChild(base::makeNativePropertyNode("string_value", std::string("test_value")));
     config_service->registerNode(props);
 
     bool bool_value = true;
@@ -121,107 +120,6 @@ TEST(ParticipantConfiguration, TestProxyConfigSetter)
         std::string("init_val"), std::string("string_value"), "deeper");
 }
 
-/** @brief Test whether a system property may be set for a system consisting of multiple participants
-* using the fep system setSystemProperty functionality.
-*/
-TEST(ParticipantConfiguration, TestSetSystemProperty)
-{
-	using namespace fep3;
-	using namespace testing;
-	
-	System system_under_test(makePlatformDepName("Blackbox"));
-	
-	auto parts = createTestParticipants({ "part1", "part2", "part3" }, system_under_test.getSystemName());
-	system_under_test.add("part1");
-	system_under_test.add("part2");
-	system_under_test.add("part3");
-
-	const auto config_service1 = parts["part1"]->_part.getComponent<IConfigurationService>();
-	ASSERT_FEP3_NOERROR(config_service1->createSystemProperty("test", "string", ""));
-	const auto config_service2 = parts["part2"]->_part.getComponent<IConfigurationService>();
-	ASSERT_FEP3_NOERROR(config_service2->createSystemProperty("test", "string", ""));
-	const auto config_service3 = parts["part3"]->_part.getComponent<IConfigurationService>();
-	ASSERT_FEP3_NOERROR(config_service3->createSystemProperty("test", "string", ""));
-
-	system_under_test.setSystemProperty("test", "string", "value");
-	
-	ASSERT_TRUE(getPropertyValue<std::string>(*config_service1, "system/test").has_value());
-	ASSERT_EQ("value", getPropertyValue<std::string>(*config_service1, "system/test").value());
-	ASSERT_TRUE(getPropertyValue<std::string>(*config_service2, "system/test").has_value());
-	ASSERT_EQ("value", getPropertyValue<std::string>(*config_service2, "system/test").value());
-	ASSERT_TRUE(getPropertyValue<std::string>(*config_service3, "system/test").has_value());
-	ASSERT_EQ("value", getPropertyValue<std::string>(*config_service3, "system/test").value());
-
-	ASSERT_FEP3_NOERROR(config_service1->createSystemProperty("nested/path/property", "int", ""));
-	ASSERT_FEP3_NOERROR(config_service2->createSystemProperty("nested/path/property", "int", ""));
-	ASSERT_FEP3_NOERROR(config_service3->createSystemProperty("nested/path/property", "int", ""));
-	
-	system_under_test.setSystemProperty("nested/path/property", "int", "123");
-
-	ASSERT_TRUE(getPropertyValue<int>(*config_service1, "system/nested/path/property").has_value());
-	ASSERT_EQ(123, getPropertyValue<int>(*config_service1, "system/nested/path/property").value());
-	ASSERT_TRUE(getPropertyValue<int>(*config_service2, "system/nested/path/property").has_value());
-	ASSERT_EQ(123, getPropertyValue<int>(*config_service2, "system/nested/path/property").value());
-	ASSERT_TRUE(getPropertyValue<int>(*config_service3, "system/nested/path/property").has_value());
-	ASSERT_EQ(123, getPropertyValue<int>(*config_service3, "system/nested/path/property").value());
-}
-
-/** @brief Test whether a system property may be created for a system consisting of multiple participants
-* even if setting the property fails for some participants of the system.
-* Setting for part2 fails because the system property does not exist.
-* Setting for part3 fails because the participant does not exist.
-*/
-TEST(ParticipantConfiguration, TestSetSystemPropertyPartialSuccess)
-{
-	using namespace fep3;
-	using namespace testing;
-
-	System system_under_test(makePlatformDepName("Blackbox"));
-
-	EventMonitorMock event_monitor_mock;
-
-	system_under_test.registerMonitoring(event_monitor_mock);
-
-	EXPECT_CALL(event_monitor_mock, onLog(_, _, _, _, _)).Times(AnyNumber());
-	EXPECT_CALL(event_monitor_mock, onLog(_, logging::Severity::warning, _, _, MatchesRegex(".*could not be set for.* part2, part3.*"))).Times(1);
-
-	auto parts = createTestParticipants({ "part1", "part2" }, system_under_test.getSystemName());
-	system_under_test.add("part1");
-	system_under_test.add("part2");
-	system_under_test.add("part3");
-
-	const auto config_service1 = parts["part1"]->_part.getComponent<IConfigurationService>();
-	ASSERT_FEP3_NOERROR(config_service1->createSystemProperty("double/property", "double", ""));
-
-	system_under_test.setSystemProperty("/double/property/", "double", "1.23");
-	
-	ASSERT_TRUE(getPropertyValue<double>(*config_service1, "system/double/property").has_value());
-	ASSERT_EQ(1.23, getPropertyValue<double>(*config_service1, "system/double/property").value());
-}
-
-/** @brief Test whether a warning is logged if setting a system property fails due to an invalid path.
-*/
-TEST(ParticipantConfiguration, TestSetSystemPropertyFailureInvalidPath)
-{
-	using namespace fep3;
-	using namespace testing;
-
-	System system_under_test(makePlatformDepName("Blackbox"));
-
-	EventMonitorMock event_monitor_mock;
-
-	system_under_test.registerMonitoring(event_monitor_mock);
-
-	EXPECT_CALL(event_monitor_mock, onLog(_, _, _, _, _)).Times(AnyNumber());
-	EXPECT_CALL(event_monitor_mock, onLog(_, logging::Severity::warning, _, _, MatchesRegex(".*could not be set for.* part1, part2.*"))).Times(1);
-
-	auto parts = createTestParticipants({ "part1", "part2" }, system_under_test.getSystemName());
-	system_under_test.add("part1");
-	system_under_test.add("part2");
-
-	system_under_test.setSystemProperty("", "type", "value");
-}
-
 TEST(ParticipantConfiguration, TestProxyConfigArraySetter)
 {
     using namespace fep3;
@@ -238,11 +136,11 @@ TEST(ParticipantConfiguration, TestProxyConfigArraySetter)
     auto& part = parts["Participant1_configuration_test"];
     auto config_service = part->_part.getComponent<IConfigurationService>();
 
-    auto props = std::make_shared<NativePropertyNode>("deeper");
-    props->setChild(makeNativePropertyNode("test_bool_array", std::vector<bool>()));
-    props->setChild(makeNativePropertyNode("test_int_array", std::vector<int32_t>()));
-    props->setChild(makeNativePropertyNode("test_double_array", std::vector<double>()));
-    props->setChild(makeNativePropertyNode("test_string_array", std::vector<std::string>()));
+    auto props = std::make_shared<base::NativePropertyNode>("deeper");
+    props->setChild(base::makeNativePropertyNode("test_bool_array", std::vector<bool>()));
+    props->setChild(base::makeNativePropertyNode("test_int_array", std::vector<int32_t>()));
+    props->setChild(base::makeNativePropertyNode("test_double_array", std::vector<double>()));
+    props->setChild(base::makeNativePropertyNode("test_string_array", std::vector<std::string>()));
     config_service->registerNode(props);
 
     std::vector<bool> bool_value_array = { true, false, true };
@@ -264,7 +162,7 @@ TEST(ParticipantConfiguration, TestProxyConfigArraySetter)
 
 /** @brief Test whether the system lib refuses to support the '.' property syntax.
 *   This means the system shall not:
-*   - set a value 
+*   - set a value
 *   - get the value
 *   - get the type
 *   of properties which use the '.' syntax.
@@ -287,15 +185,15 @@ TEST(cTesterParticipantConfiguration, TestInvalidPropertySyntax)
     auto& part = parts["Participant1_configuration_test"];
     auto config_service = part->_part.getComponent<IConfigurationService>();
 
-    auto props = std::make_shared<NativePropertyNode>("test_node");
-    props->setChild(makeNativePropertyNode("bool_value", false));
-    props->setChild(makeNativePropertyNode("int_value", 1));
-    props->setChild(makeNativePropertyNode("double_value", double(0.1)));
-    props->setChild(makeNativePropertyNode("string_value", std::string("test_value")));
+    auto props = std::make_shared<base::NativePropertyNode>("test_node");
+    props->setChild(base::makeNativePropertyNode("bool_value", false));
+    props->setChild(base::makeNativePropertyNode("int_value", 1));
+    props->setChild(base::makeNativePropertyNode("double_value", double(0.1)));
+    props->setChild(base::makeNativePropertyNode("string_value", std::string("test_value")));
     config_service->registerNode(props);
 
     // we have to set already existing properties because not existing properties may not be set using the system lib
-    
+
     bool bool_value = true;
     testSetGetInvalidFormat(config.getInterface(), bool_value, "test_node.test_bool");
 
@@ -329,13 +227,13 @@ TEST(cTesterParticipantConfiguration, TestRootPropertySetter)
     auto& part = parts["Participant1_configuration_test"];
     auto config_service = part->_part.getComponent<IConfigurationService>();
 
-    auto props = std::make_shared<NativePropertyNode>("test_node");
-    props->setChild(makeNativePropertyNode("bool_value", false));
+    auto props = std::make_shared<base::NativePropertyNode>("test_node");
+    props->setChild(base::makeNativePropertyNode("bool_value", false));
 
     int32_t initial_int_value = 4;
-    auto prop_sub = makeNativePropertyNode("int_value_sub", initial_int_value);
+    auto prop_sub = base::makeNativePropertyNode("int_value_sub", initial_int_value);
     props->setChild(prop_sub);
-    prop_sub->setChild(makeNativePropertyNode("child_int_value", initial_int_value));
+    prop_sub->setChild(base::makeNativePropertyNode("child_int_value", initial_int_value));
 
     config_service->registerNode(props);
 
@@ -380,7 +278,7 @@ TEST(cTesterParticipantConfiguration, TestProxyConfigPropNotExistsNoCreate)
     auto& part = parts["Participant1_configuration_test"];
     auto config_service = part->_part.getComponent<IConfigurationService>();
 
-    auto prop_opt = getPropertyValue<std::string>(*config_service, "test_does_not_exists");
+    auto prop_opt = base::getPropertyValue<std::string>(*config_service, "test_does_not_exists");
     //check if it does not exists
     ASSERT_FALSE(prop_opt);
 
@@ -397,7 +295,7 @@ TEST(cTesterParticipantConfiguration, TestProxyConfigPropNotExistsNoCreate)
     ASSERT_EQ(retval, std::string());
     ASSERT_EQ(retval_type, std::string());
 
-    prop_opt = getPropertyValue<std::string>(*config_service, "test_does_not_exists");
+    prop_opt = base::getPropertyValue<std::string>(*config_service, "test_does_not_exists");
     //check if it does not exists
     ASSERT_FALSE(prop_opt);
 }

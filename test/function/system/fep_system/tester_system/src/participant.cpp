@@ -1,24 +1,22 @@
 /**
- * Implementation of the tester for the FEP Data Sample (locking)
- *
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
  /**
  * Test Case:   TestSystemLibrary
@@ -35,15 +33,17 @@
 #include <fep_system/fep_system.h>
 #include <string.h>
 #include "fep_test_common.h"
+#include <fep3/components/experimental/health_service_intf.h>
 
+using namespace fep3;
 
 class TestEventMonitor : public fep3::IEventMonitor
 {
 public:
     void onLog(std::chrono::milliseconds,
-        fep3::logging::Severity severity_level,
+        fep3::LoggerSeverity severity_level,
         const std::string& participant_name,
-        const std::string& logger_name, //depends on the Category ... 
+        const std::string& logger_name, //depends on the Category ...
         const std::string& message) override
     {
         std::unique_lock<std::mutex> lk(_cv_m);
@@ -76,7 +76,7 @@ public:
         return false;
     }
 
-    fep3::logging::Severity _severity_level;
+    fep3::LoggerSeverity _severity_level;
     std::string _participant_name;
     std::string _message;
     std::string _logger_name;
@@ -87,29 +87,39 @@ private:
     std::atomic_bool _done{ false };
 };
 
-
-TEST(SystemLibrary, TestStateProxy)
+struct SystemLibrarySingleParticipant : public testing::Test
 {
-    using namespace fep3;
-    System systm(makePlatformDepName("Blackbox"));
-    TestParticipants participants;
+    SystemLibrarySingleParticipant()
+        : _system(makePlatformDepName(_system_name))
+    {
+    }
 
+    void SetUp() override
+    {
+        ASSERT_NO_THROW(
+            _participants = createTestParticipants({ _participant_name }, _system.getSystemName());
+        );
 
-    std::string participant1_name = "Participant1";
-    ASSERT_NO_THROW(
-          participants = createTestParticipants({ participant1_name }, systm.getSystemName());
-    );
+        ASSERT_NO_THROW(
+            _system.add(_participant_name);
+        );
+    }
 
-    ASSERT_NO_THROW(
-        systm.add(participant1_name);
-    );
+    const char* _system_name{ "test_system" };
+    System _system;
 
-    auto p1 = systm.getParticipant(participant1_name);
+    TestParticipants _participants{};
+    const std::string _participant_name{"test_participant"};
+};
+
+TEST_F(SystemLibrarySingleParticipant, TestStateProxy)
+{
+    auto p1 = _system.getParticipant(_participant_name);
     auto sm = p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>();
 
     ASSERT_TRUE(p1);
     ASSERT_TRUE(sm);
-   
+
     ASSERT_EQ(sm->getRPCDefaultName(), rpc::getRPCDefaultName<fep3::rpc::IRPCParticipantStateMachine>());
     ASSERT_EQ(sm->getRPCIID(), rpc::getRPCIID<fep3::rpc::IRPCParticipantStateMachine>());
 
@@ -125,15 +135,6 @@ TEST(SystemLibrary, TestStateProxy)
     ASSERT_EQ(sm->getState(), rpc::ParticipantState::running);
 
     sm->stop();
-    // beauty sleep to secure state is reached
-    ASSERT_EQ(sm->getState(), rpc::ParticipantState::initialized);
-
-    sm->pause();
-    // beauty sleep to secure state is reached
-    ASSERT_EQ(sm->getState(), rpc::ParticipantState::paused);
-
-    sm->stop();
-    // beauty sleep to secure state is reached
     ASSERT_EQ(sm->getState(), rpc::ParticipantState::initialized);
 
     sm->deinitialize();
@@ -163,29 +164,15 @@ bool contains(const std::vector<std::string>& list_of_components, const std::vec
     return (found == list_of_components_expected.size());
 }
 
-TEST(SystemLibrary, TestParticpantInfo)
+TEST_F(SystemLibrarySingleParticipant, TestParticpantInfo)
 {
-    using namespace fep3;
-    System systm(makePlatformDepName("Blackbox"));
-    TestParticipants participants;
-
-
-    std::string participant1_name = "Participant1";
-    ASSERT_NO_THROW(
-        participants = createTestParticipants({ participant1_name }, systm.getSystemName());
-    );
-
-    ASSERT_NO_THROW(
-        systm.add(participant1_name);
-    );
-
-    auto p1 = systm.getParticipant(participant1_name);
+    auto p1 = _system.getParticipant(_participant_name);
     auto pi = p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantInfo>();
- 
+
     ASSERT_EQ(pi->getRPCDefaultName(), rpc::getRPCDefaultName<fep3::rpc::IRPCParticipantInfo>());
     ASSERT_EQ(pi->getRPCIID(), rpc::getRPCIID<fep3::rpc::IRPCParticipantInfo>());
-    ASSERT_EQ(pi->getSystemName(), systm.getSystemName());
-    ASSERT_EQ(pi->getName(), participant1_name);
+    ASSERT_EQ(pi->getSystemName(), _system.getSystemName());
+    ASSERT_EQ(pi->getName(), _participant_name);
 
     ASSERT_TRUE(!(pi->getRPCComponentInterfaceDefinition(rpc::getRPCDefaultName<fep3::rpc::IRPCParticipantInfo>(), rpc::getRPCIID<fep3::rpc::IRPCParticipantInfo>()).empty()));
 
@@ -209,7 +196,7 @@ TEST(SystemLibrary, TestDataRegistry)
     systm.add(mod.GetName());
     auto p1 = systm.getParticipant(mod.GetName());
     auto dr = p1.getRPCComponentProxy<fep::rpc::IRPCDataRegistry>();
-  
+
     ASSERT_STREQ(dr->getRPCDefaultName(), "data_registry");
     ASSERT_STREQ(dr->getRPCIID(), "data_registry.iid");
     std::vector<std::string> ref_vec{ "tFEP_Examples_ObjectState" };
@@ -243,7 +230,7 @@ TEST(SystemLibrary, TestProxiesNOK)
     ASSERT_TRUE(caught);
     tem.waitForDone(3000);
 
-    ASSERT_EQ(tem._severity_level, logging::Severity::fatal);
+    ASSERT_EQ(tem._severity_level, LoggerSeverity::fatal);
     ASSERT_EQ(tem._participant_name, "does_not_exist");
     ASSERT_EQ(tem._logger_name, systm.getSystemName());
     ASSERT_TRUE(tem._message.find("Participant does_not_exist is unreachable") != std::string::npos);
@@ -264,4 +251,23 @@ TEST(SystemLibrary, TestProxiesNOK)
     }
 
     systm.unregisterMonitoring(tem);
+}
+
+/**
+ * @brief Test whether a ParticipantProxy can be destroyed successfully
+ * if the corresponding System has been destroyed already.
+ * 
+ */
+TEST(SystemLibrary, DtorParticipantProxy)
+{
+    ParticipantProxy p1;
+
+    // Intended scope to destroy system before p1
+    {
+        System system(makePlatformDepName("test_system"));
+        const char* participant_name = "test_participant";
+        auto participants = createTestParticipants({ participant_name }, system.getSystemName());
+        system.add(participant_name);
+        p1 = system.getParticipant(participant_name);
+    }
 }

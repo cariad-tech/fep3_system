@@ -1,22 +1,22 @@
-/*
+/**
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
 #pragma once
 #include <string>
@@ -28,6 +28,8 @@
 #include "rpc_services/data_registry_proxy.hpp"
 #include "rpc_services/logging_proxy.hpp"
 #include "rpc_services/configuration_proxy.hpp"
+#include "rpc_services/health_proxy.hpp"
+#include "rpc_services/rpc_passthrough.hpp"
 #include "service_bus_factory.h"
 #include <math.h>
 
@@ -37,8 +39,8 @@ namespace fep3
 struct ParticipantProxy::Implementation
 {
 public:
-    //this is the current type used within connect() 
-    //usually this type must be supported as lowest versioned types forever ! 
+    //this is the current type used within connect()
+    //usually this type must be supported as lowest versioned types forever !
     typedef rpc::arya::IRPCParticipantInfo ConnectParticipantInfo;
     typedef rpc::arya::IRPCParticipantStateMachine ConnectStateMachine;
     typedef rpc::arya::IRPCLoggingSinkService ConnectLoggingSinkService;
@@ -64,8 +66,8 @@ public:
         {
             try
             {
-                //it is very important to use arya here ... 
-                //because we support versioning !! 
+                //it is very important to use arya here ...
+                //because we support versioning !!
                 RPCComponent<T> val;
                 if (_proxy_impl->getRPCComponentProxy(T::getRPCDefaultName(),
                     T::getRPCIID(),
@@ -142,7 +144,7 @@ public:
         const std::string& participant_url,
         const std::string& system_name,
         const std::string& system_discovery_url,
-        ISystemLogger& logger,
+        std::shared_ptr<ISystemLogger> logger,
         std::chrono::milliseconds default_timeout) :
         _participant_name(participant_name),
         _participant_url(participant_url),
@@ -159,7 +161,7 @@ public:
         _system_access = _service_bus_connection->getSystemAccess(system_name);
         if (!_system_access)
         {
-            throw std::runtime_error(std::string("While contructing ") + participant_name + " at " + participant_url 
+            throw std::runtime_error(std::string("While contructing ") + participant_name + " at " + participant_url
                 + "no system connection to " + system_name + " at " + system_discovery_url +" possible");
         }
         _info.getValue();
@@ -171,21 +173,28 @@ public:
             auto logging = _logging.getValue();
             if (logging)
             {
-                logging->registerRPCClient(_logger.getUrl());
+                logging->registerRPCClient(_logger->getUrl());
                 _registered_logging = true;
             }
         }
     }
-    virtual ~Implementation()
+
+    void deregisterLogging()
     {
         if (_registered_logging)
         {
             auto logging = _logging.getValue();
             if (logging)
             {
-                logging->unregisterRPCClient(_logger.getUrl());
+                logging->unregisterRPCClient(_logger->getUrl());
+                _registered_logging = false;
             }
         }
+    }
+
+    virtual ~Implementation()
+    {
+        deregisterLogging();
     }
 
     void copyValuesTo(Implementation& other) const
@@ -229,7 +238,7 @@ public:
     int32_t getInitPriority() const
     {
         return _init_priority;
-    }    
+    }
 
     bool getRPCComponentProxy(const std::string& component_name,
         const std::string& component_iid,
@@ -260,6 +269,14 @@ public:
                 _system_access->getRequester(_participant_name));
             return proxy_ptr.reset(part_object);
         }
+        else if (component_iid == fep3::rpc::getRPCIID<fep3::rpc::experimental::RPCPassthrough>())
+        {
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
+            part_object = std::make_shared<rpc::experimental::RPCPassthrough>(
+                component_name,
+                _system_access->getRequester(_participant_name));
+            return proxy_ptr.reset(part_object);
+        }
 
         auto names = getComponentNameWhichSupports(component_iid);
         bool found_and_support = false;
@@ -285,7 +302,7 @@ public:
         //this is our list to raise ... maybe we need a factory in the future
         if (component_iid == fep3::rpc::getRPCIID<rpc::arya::IRPCParticipantInfo>())
         {
-            //also if this type is the same like ConnectParticipantInfo 
+            //also if this type is the same like ConnectParticipantInfo
             //we check that here for future use!!
             std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
             part_object = std::make_shared<rpc::arya::ParticipantInfoProxy>(
@@ -324,7 +341,7 @@ public:
                 component_name,
                 _system_access->getRequester(_participant_name),
                 _participant_name,
-                _logger);
+                *_logger);
             return proxy_ptr.reset(part_object);
         }
         else if (component_iid == fep3::rpc::getRPCIID<rpc::arya::IRPCLoggingSinkService>())
@@ -342,10 +359,18 @@ public:
                 _participant_name,
                 component_name,
                 _system_access->getRequester(_participant_name),
-                _logger);
+                *_logger);
             return proxy_ptr.reset(part_object);
         }
-        
+        else if (component_iid == fep3::rpc::getRPCIID<experimental::IRPCHealthService>())
+        {
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
+            part_object = std::make_shared<experimental::arya::HealthServiceProxy>(
+                component_name,
+                _system_access->getRequester(_participant_name));
+            return proxy_ptr.reset(part_object);
+        }
+
         return false;
     }
 
@@ -400,8 +425,8 @@ public:
         if (!info)
         {
             std::string err_message = "Participant " + getParticipantName() + " is unreachable";
-            _logger.log(
-                logging::Severity::fatal,
+            _logger->log(
+                LoggerSeverity::fatal,
                 getParticipantName(),
                 _system_access->getName(),
                 err_message);
@@ -440,8 +465,13 @@ public:
         }
     }
 
+    bool loggingRegistered() const
+    {
+        return _registered_logging;
+    }
+
 private:
-    ISystemLogger& _logger;
+    std::shared_ptr<ISystemLogger> _logger;
     std::string _participant_name;
     std::string _participant_url;
 
@@ -452,7 +482,7 @@ private:
     bool _registered_logging{ false };
     mutable RPCComponentCache<ConnectConfigurationService> _config;
 
-    
+
 
     int32_t _init_priority;
     int32_t _start_priority;

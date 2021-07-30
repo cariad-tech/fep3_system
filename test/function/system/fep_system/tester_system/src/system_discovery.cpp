@@ -1,23 +1,23 @@
 /**
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
- 
+
+
 #include <gtest/gtest.h>
 #include <fep_system/fep_system.h>
 #include <string.h>
@@ -30,7 +30,7 @@
  */
 /*
 TEST(SystemDiscovery, StandaloneModulesWillNotBeDiscovered)
-{    
+{
     const auto participant_names = std::vector<std::string>
         { "standalone_participant"
         , "participant_no_standalone_path"
@@ -64,20 +64,20 @@ TEST(SystemDiscovery, StandaloneModulesWillNotBeDiscovered)
         }
         );
         return temp;
-    }();    
-    EXPECT_EQ(discoverd_names, std::vector<std::string>({"participant3", "participant_no_standalone_path"}));    
+    }();
+    EXPECT_EQ(discoverd_names, std::vector<std::string>({"participant3", "participant_no_standalone_path"}));
 }*/
 
 /**
  * @brief The discovery of participants is tested
- * @req_id 
+ * @req_id
  */
 TEST(SystemDiscovery, DiscoverSystem)
 {
     auto sys_name = makePlatformDepName("test_system");
     const auto participant_names = std::vector<std::string>{ "participant1", "participant2" };
     const TestParticipants test_parts = createTestParticipants(participant_names, sys_name);
-    
+
     /// discover system
     fep3::System my_system;
     ASSERT_NO_THROW(
@@ -95,7 +95,7 @@ TEST(SystemDiscovery, DiscoverSystem)
             , [](decltype(discovered_participants)::value_type participant)
                 {
                     return participant.getName();
-                }    
+                }
             );
         return temp;
     }();
