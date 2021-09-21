@@ -144,5 +144,4 @@ documentation:
         - doc/html/.+\.inv
         - doc/html/.+\.ico
         - doc/html/\.buildinfo
-        - doc/license/mpl.md
-        - doc/license/MPL2.0.txt
+        - LICENSE
