@@ -1,22 +1,22 @@
 /**
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
 #pragma once
 
@@ -47,22 +47,22 @@ public:
     /**
      * @brief Sets the configuration for a given logger (domain)
      *
-     * @param [in] logger_name       The logger name / domain to be configured
-     * @param [in] configuration     A POD object that holds the configuration settings
+     * @param[in] logger_name       The logger name / domain to be configured
+     * @param[in] configuration     A POD object that holds the configuration settings
      *
-     * @return returns if the configuration is successful. Error details get logged.
+     * @return @c true if the configuration is successful, @c false otherwise
      */
     virtual bool setLoggerFilter(const std::string& logger_name,
-                                 const logging::LoggerFilter& configuration) const = 0;
+                                 const LoggerFilter& configuration) const = 0;
 
     /**
      * @brief gets the configuration for a given logger (domain)
      *
-     * @param [in] logger_name       The logger name / domain to get the current set filter for
+     * @param[in] logger_name       The logger name / domain to get the current set filter for
      *
      * @return returns the configured loggerfilter if found. otherwise it is empty.
      */
-    virtual logging::LoggerFilter getLoggerFilter(const std::string& logger_name) const = 0;
+    virtual LoggerFilter getLoggerFilter(const std::string& logger_name) const = 0;
 
     /**
      * @brief gets a list of the available loggers
@@ -81,7 +81,7 @@ public:
     /**
      * @brief get the properties of the given sink.
      *
-     * @param [in] sink_name name of the sink 
+     * @param[in] sink_name name of the sink
      *
      * @return returns the properties of the sink
      */
@@ -89,9 +89,9 @@ public:
 };
 
 /**
- * The RPC Logging Sink Service interface provide functionality to register and unregister 
+ * The RPC Logging Sink Service interface provide functionality to register and unregister
  * a server address where the log messages can be send to.
- * 
+ *
  */
 class IRPCLoggingSinkService : public IRPCLoggingSinkServiceDef
 {
@@ -104,7 +104,7 @@ public:
     /**
     * @brief registers the address at the service to receive messages
     *
-    * @param [in] url valid url to send the log messages to
+    * @param[in] url valid url to send the log messages to
     *
     * @return returns 0 if succeeded
     */
@@ -112,7 +112,7 @@ public:
     /**
     * @brief unregisters the address from the service to stop sending log messages to that address
     *
-    * @param [in] url valid url where the messages was sent to
+    * @param[in] url valid url where the messages was sent to
     *
     * @return returns 0 if succeeded
     */

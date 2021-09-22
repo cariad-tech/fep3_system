@@ -1,22 +1,22 @@
 /**
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
 #pragma once
 #include <string>
@@ -25,14 +25,14 @@
 //this will be installed !!
 #include "rpc_services/configuration/configuration_rpc_intf.h"
 #include <fep_system_stubs/configuration_service_proxy_stub.h>
-#include "base/properties/property_type.h"
-#include "base/properties/property_type_conversion.h"
+#include <fep3/base/properties/property_type.h>
+#include <fep3/base/properties/property_type_conversion.h>
 #include "system_logger_intf.h"
 
 #include <a_util/strings.h>
 
 #define FEP3_CONFIG_LOG_RESULT(_res_, _participant_name_, _component_name_, _method_, _path_) { \
-_logger.log(logging::Severity::error, _participant_name_, \
+_logger.log(LoggerSeverity::error, _participant_name_, \
 _component_name_, \
 a_util::strings::format("Can not %s '%s' due to following error : (%d - %s)  ", \
     _method_.c_str(), \
@@ -82,9 +82,9 @@ private:
         ConfigurationProperty(
             const std::string& participant_name,
             const std::string& component_name,
-            const std::shared_ptr<rpc::IRPCRequester>& rpc,
+            const std::shared_ptr<IRPCRequester>& rpc,
             std::string property_path,
-            ISystemLogger& logger) : 
+            ISystemLogger& logger) :
             RPCConfigClient(component_name, rpc),
             _property_path(std::move(property_path)),
             _logger(logger),
@@ -144,7 +144,7 @@ private:
                 if (type.empty())
                 {
                     FEP3_CONFIG_LOG_RESULT(fep3::Result(ERR_PATH_NOT_FOUND),
-                        _participant_name, 
+                        _participant_name,
                         _component_name,
                         std::string("getProperty"),
                         path);
@@ -193,7 +193,7 @@ private:
 
         bool isEqual(const IProperties& properties) const
         {
-            Properties<IProperties> mirrored_properties;
+            base::Properties<IProperties> mirrored_properties;
             auto prop_names = getPropertyNames();
             for (const auto& prop_name : prop_names)
             {
@@ -204,9 +204,9 @@ private:
             return mirrored_properties.isEqual(properties);
         }
 
-        void copy_to(IProperties& properties) const
+        void copyTo(IProperties& properties) const
         {
-            Properties<IProperties> mirrored_properties;
+            base::Properties<IProperties> mirrored_properties;
             auto prop_names = getPropertyNames();
             for (const auto& prop_name : prop_names)
             {
@@ -265,8 +265,8 @@ public:
     using RPCConfigProxy::GetStub;
     ConfigurationProxy(const std::string& participant_name,
         const std::string& rpc_component_name,
-        const std::shared_ptr<rpc::IRPCRequester>& rpc,
-        ISystemLogger& logger) : 
+        const std::shared_ptr<IRPCRequester>& rpc,
+        ISystemLogger& logger) :
         RPCConfigProxy(rpc_component_name, rpc),
         _logger(logger),
         _participant_name(participant_name),
@@ -331,7 +331,7 @@ public:
     {
         std::string normalized_path = normalizePath(property_path);
 
-    	if (GetStub().exists(normalized_path))
+        if (GetStub().exists(normalized_path))
         {
             return std::make_shared<ConfigurationProperty>(
                 _participant_name,
@@ -354,7 +354,7 @@ private:
     ISystemLogger&                    _logger;
     std::string                       _participant_name;
     std::string                       _component_name;
-    std::shared_ptr<rpc::IRPCRequester> _rpc;
+    std::shared_ptr<IRPCRequester> _rpc;
 };
 
 }

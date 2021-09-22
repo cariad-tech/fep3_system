@@ -1,21 +1,22 @@
 /**
-* @file
-*
-* @copyright
-* @verbatim
-Copyright @ 2020 Audi AG. All rights reserved.
+ * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-This Source Code Form is subject to the terms of the Mozilla
-Public License, v. 2.0. If a copy of the MPL was not distributed
-with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 If it is not possible or desirable to put the notice in a particular file, then
 You may include the notice in a location (such as a LICENSE file in a
 relevant directory) where a recipient would be likely to look for such a notice.
 
 You may add additional accurate notices of copyright ownership.
+
 @endverbatim
-*/
+ */
+
 #pragma once
 
 #include "fep_system/fep_system_types.h"
@@ -25,6 +26,7 @@ You may add additional accurate notices of copyright ownership.
 #include "rpc_services/clock/clock_service_rpc_intf.h"
 #include "rpc_services/data_registry/data_registry_rpc_intf.h"
 #include "rpc_services/configuration/configuration_rpc_intf.h"
+#include "rpc_services/health/health_service_rpc_intf.h"
 #include "rpc_services/logging/logging_rpc_intf.h"
 #include "system_logger_intf.h"
 
@@ -58,42 +60,42 @@ public:
     /**
      * @brief Construct a new Participant Proxy object
      *
-     * @param participant_name name of the participant
-     * @param participant_url participants server url of the participant
-     * @param system_name name of the system
-     * @param system_url url of the system
-     * @param logger logger to log values to.
-     * @param default_timeout default timeout for each rpc request
+     * @param[in] participant_name name of the participant
+     * @param[in] participant_url participants server url of the participant
+     * @param[in] system_name name of the system
+     * @param[in] system_url url of the system
+     * @param[in] logger logger to log values to.
+     * @param[in] default_timeout default timeout for each rpc request
      */
     ParticipantProxy(const std::string& participant_name,
         const std::string& participant_url,
         const std::string& system_name,
         const std::string& system_url,
-        ISystemLogger& logger,
+        std::shared_ptr<ISystemLogger> logger,
         std::chrono::milliseconds default_timeout);
     /**
      * @brief Construct a new Participant Proxy object
      *
-     * @param other the other to move
+     * @param[in] other the other to move
      */
     ParticipantProxy(ParticipantProxy&& other);
     /**
      * @brief move the other to the current instance
      *
-     * @param other the other
+     * @param[in] other the other
      * @return ParticipantProxy& value of this
      */
     ParticipantProxy& operator=(ParticipantProxy&& other);
     /**
      * @brief Construct a new Participant Proxy object
      *
-     * @param other the other to copy
+     * @param[in] other the other to copy
      */
     ParticipantProxy(const ParticipantProxy& other);
     /**
      * @brief copies another participant prox instance to the current
      *
-     * @param other the other to copy
+     * @param[in] other the other to copy
      * @return ParticipantProxy&
      */
     ParticipantProxy& operator=(const ParticipantProxy& other);
@@ -112,7 +114,7 @@ public:
     /**
      * Helper function to copy content.
      *
-     * @param other the participant to copy values to
+     * @param[in] other the participant to copy values to
      */
     void copyValuesTo(ParticipantProxy& other) const;
 
@@ -124,7 +126,7 @@ public:
     * The lower the priority the later the participant will be triggered.
     * Negative values are allowed
     *
-    * @param [in] priority    priority, the participant should use for loading, initialization
+    * @param[in] priority priority, the participant should use for loading, initialization
     * @see @ref fep3::System::load, fep3::System::initialize
     */
     void setInitPriority(int32_t priority);
@@ -143,7 +145,7 @@ public:
      * The lower the priority the later the participant will be triggered.
      * Negative values are allowed
      *
-     * @param [in] priority    priority, the participant should use for initialization
+     * @param[in] priority    priority, the participant should use for initialization
      * @see @ref fep3::System::start, @ref fep3::System::pause
      */
     void setStartPriority(int32_t priority);
@@ -172,16 +174,16 @@ public:
     /**
      * @brief sets additional information might be needed internally
      *
-     * @param key additional information identifier
-     * @param value the value
+     * @param[in] key additional information identifier
+     * @param[in] value the value
      */
     void setAdditionalInfo(const std::string& key, const std::string& value);
 
     /**
      * @brief gets additional information corresponding with the participant
      *
-     * @param key additional information identifier you want to retrieve
-     * @param value_default the value if the key is not found
+     * @param[in] key additional information identifier you want to retrieve
+     * @param[in] value_default the value if the key is not found
      *
      * @return std::string the value found or the value_default
      */
@@ -191,11 +193,11 @@ public:
      * @brief this internal function searches and connect to the participants RPC Service by name and id.
      * Please use i.e. getRPCComponentProxy<rpc::IParticipantStateMachine>(...)
      *
-     * @param component_name the rpc server name of the rpc component
-     * @param component_iid  the rpc server interface identifier of the rpc component to request
-     * @param proxy_ptr will contain the valid interface if available
-     * @return true the server is reachable
-     * @return false the server is not reachable, the server object does not exist or the given interface is not supported
+     * @param[in] component_name the rpc server name of the rpc component
+     * @param[in] component_iid  the rpc server interface identifier of the rpc component to request
+     * @param[out] proxy_ptr will contain the valid interface if available
+     * @return @c true if the server is reachable, @c false otherwise (not reachable, the
+     server object does not exist or the given interface is not supported)
      * \throw runtime_error See exception for more information
      */
     bool getRPCComponentProxy(const std::string& component_name,
@@ -206,10 +208,10 @@ public:
      * It uses the first found.
      * Please use i.e. getRPCComponentProxyByIID<rpc::IParticipantStateMachine>(...)
      *
-     * @param component_iid  the rpc component service interface identifier looking for
-     * @param proxy_ptr will contain the valid interface if available
-     * @return true the server is reachable
-     * @return false the server is not reachable, the server object does not exist or the given interface is not supported
+     * @param[in] component_iid  the rpc component service interface identifier looking for
+     * @param[out] proxy_ptr will contain the valid interface if available
+     * @return @c true the server is reachable, @c false otherwise (the server is not reachable,
+     * the server object does not exist or the given interface is not supported)
      * \throw runtime_error See exception for more information
      */
     bool getRPCComponentProxyByIID(const std::string& component_iid,
@@ -262,6 +264,18 @@ public:
             return component_proxy;
         }
     }
+    /**
+     * If logging is enabled this unregisters from logger.
+     */
+    void deregisterLogging();
+
+    /**
+     * Check if the participant has a SystemLogger interface registered.
+     *
+     * @retval True if a logging interface is registered, false otherwise.
+     */
+    bool loggingRegistered() const;
+
     /// @cond no_documentation
 private:
     struct Implementation;

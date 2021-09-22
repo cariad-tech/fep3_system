@@ -1,5 +1,5 @@
 #
-# Copyright @ 2020 Audi AG. All rights reserved.
+# Copyright @ 2021 VW Group. All rights reserved.
 # 
 #     This Source Code Form is subject to the terms of the Mozilla
 #     Public License, v. 2.0. If a copy of the MPL was not distributed
@@ -10,8 +10,9 @@
 # relevant directory) where a recipient would be likely to look for such a notice.
 # 
 # You may add additional accurate notices of copyright ownership.
-
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+# 
+#
+cmake_minimum_required(VERSION 3.17.0 FATAL_ERROR)
 cmake_policy(SET CMP0011 NEW)
 
 # Disable extensions here and require the chosen CMAKE_CXX_STANDARD (coming from Conan)
@@ -22,7 +23,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Use shared libraries from current directory on Linux (same behavior as on Windows)
 SET(CMAKE_INSTALL_RPATH "$ORIGIN")
 
-project(fep3-system-library VERSION 3.0.0)
+file(STRINGS version
+    VERSION
+    LIMIT_COUNT 1
+)
+project(fep3-system-library VERSION ${VERSION})
 set(FEP3_SYSTEM_LIBRARY fep3_system)
 
 set(FEP3_SYSTEM_LIB_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
@@ -66,7 +71,6 @@ if(CONAN_COMPILER)
         conan_basic_setup(TARGETS NO_OUTPUT_DIRS)
     endif()
 
-    set(gtest_search_mode CONFIG)
     set(DOXYGEN_ROOT ${CONAN_DOXYGEN_ROOT})
 endif()
 
@@ -78,6 +82,8 @@ option(fep3_system_cmake_enable_tests
 
 include(scripts/cmake/enable_multicore_compilation.cmake)
 include(scripts/cmake/use_integrated_debug_symbols.cmake)
+
+set(fep3_system_pdb_version_str ${FEP3_SYSTEM_LIB_VERSION_MAJOR}.${FEP3_SYSTEM_LIB_VERSION_MINOR})
 include(src/fep_system/fep3_system-macros.cmake)
 
 ### Set basic and obligatory CMake parameters and find Project Templates package.
@@ -99,8 +105,7 @@ if (UNIX)
     set(CMAKE_SKIP_BUILD_RPATH  OFF)
 endif(UNIX)
 
-find_package(a_util REQUIRED)
-find_package(pkg_rpc REQUIRED)
+find_package(dev_essential REQUIRED COMPONENTS datetime system datetime process strings xml pkg_rpc)
 find_package(fep3_participant REQUIRED)
 set(PARTICIPANT_LIB_DIR ${fep3_participant_DIR})
 
@@ -122,6 +127,8 @@ install(
     DESTINATION include/fep_system
 )
 
+find_package(Boost REQUIRED)
+message("BOOST INCLUDE DIR PROCESS ${Boost_INCLUDE_DIR}")
 # add subdirectories core
 add_subdirectory(src)
 if (fep3_system_cmake_enable_documentation)
@@ -130,8 +137,6 @@ endif()
 # install content from include directory
 install(FILES README.md
         DESTINATION .)
-install(FILES doc/changelog.md
-        DESTINATION doc)
 
 if (fep3_system_cmake_enable_tests)
     enable_testing()

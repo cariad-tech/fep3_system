@@ -1,0 +1,18 @@
+[
+  // Registers an event listener rpc service
+  {
+    "name": "registerEventListenerRPCService",
+    "params": {
+      "address": "url"
+    },
+    "returns": 0 //registration success
+  },
+  // Unregisters an event listener rpc service
+  {
+    "name": "unregisterEventListenerRPCService",
+    "params": {
+      "address": "url"
+    },
+    "returns": 0 //unregistration success
+  }
+]

@@ -1,24 +1,22 @@
 /**
- * Implementation of the tester for the FEP Data Sample (locking)
- *
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
  /**
  * Test Case:   TestSystemLibrary
@@ -33,9 +31,9 @@
 
 #include <gtest/gtest.h>
 #include <fep_system/fep_system.h>
-#include "fep_system/base/properties/property_type.h"
-#include "fep_system/base/properties/property_type_conversion.h"
-#include <fep3/components/configuration/propertynode_helper.h>
+#include <fep3/base/properties/property_type.h>
+#include <fep3/base/properties/property_type_conversion.h>
+#include <fep3/base/properties/propertynode_helper.h>
 
 
 template<typename T>
@@ -47,15 +45,15 @@ void testGetter(fep3::IConfigurationService& config_service,
 {
     std::string path_with_slashes = deeper_path + "/" + propertyname;
 
-    ASSERT_TRUE(fep3::isOk(fep3::setPropertyValue<T>(config_service, path_with_slashes, value)));
+    ASSERT_TRUE(fep3::isOk(fep3::base::setPropertyValue<T>(config_service, path_with_slashes, value)));
 
     auto properties_to_test = rpc_config.getProperties("/" + deeper_path);
     auto property_names = properties_to_test->getPropertyNames();
     ASSERT_TRUE(std::find(property_names.begin(), property_names.end(), propertyname) != property_names.end());
 
-    ASSERT_EQ(properties_to_test->getPropertyType(propertyname), fep3::PropertyType<T>::getTypeName());
+    ASSERT_EQ(properties_to_test->getPropertyType(propertyname), fep3::base::PropertyType<T>::getTypeName());
 
-    ASSERT_EQ(fep3::DefaultPropertyTypeConversion<T>::fromString(properties_to_test->getProperty(propertyname)),
+    ASSERT_EQ(fep3::base::DefaultPropertyTypeConversion<T>::fromString(properties_to_test->getProperty(propertyname)),
         value);
 }
 
@@ -70,19 +68,19 @@ void testSetter(fep3::IConfigurationService& config_service,
 {
     std::string propertypath_with_slashes = deeper_path + "/" + propertyname;
 
-    ASSERT_TRUE(fep3::isOk(fep3::setPropertyValue<T>(config_service, propertypath_with_slashes, init_value)));
+    ASSERT_TRUE(fep3::isOk(fep3::base::setPropertyValue<T>(config_service, propertypath_with_slashes, init_value)));
 
     auto properties_to_test = rpc_config.getProperties("/" + deeper_path);
     auto property_names = properties_to_test->getPropertyNames();
     ASSERT_TRUE(std::find(property_names.begin(), property_names.end(), propertyname) != property_names.end());
 
-    ASSERT_EQ(properties_to_test->getPropertyType(propertyname), fep3::PropertyType<T>::getTypeName());
+    ASSERT_EQ(properties_to_test->getPropertyType(propertyname), fep3::base::PropertyType<T>::getTypeName());
 
     ASSERT_TRUE(properties_to_test->setProperty(propertyname,
-        fep3::DefaultPropertyTypeConversion<T>::toString(value),
-        fep3::PropertyType<T>::getTypeName()));
+        fep3::base::DefaultPropertyTypeConversion<T>::toString(value),
+        fep3::base::PropertyType<T>::getTypeName()));
 
-    auto ret_value = fep3::getPropertyValue<T>(config_service, propertypath_with_slashes);
+    auto ret_value = fep3::base::getPropertyValue<T>(config_service, propertypath_with_slashes);
     ASSERT_TRUE(ret_value);
     ASSERT_EQ(*ret_value, value);
 }
@@ -97,8 +95,8 @@ inline void testSetGetInvalidFormat(fep3::rpc::IRPCConfiguration& rpc_config,
     auto property_names = properties_to_test->getPropertyNames();
 
     ASSERT_FALSE(properties_to_test->setProperty(property_path,
-        fep3::DefaultPropertyTypeConversion<T>::toString(value),
-        fep3::PropertyType<std::string>::getTypeName()));
+        fep3::base::DefaultPropertyTypeConversion<T>::toString(value),
+        fep3::base::PropertyType<std::string>::getTypeName()));
 
     ASSERT_EQ("", properties_to_test->getProperty(property_path));
 
@@ -116,16 +114,16 @@ void testSetGetRoot(fep3::rpc::IRPCConfiguration& rpc_config,
     auto properties_to_test = rpc_config.getProperties(property_path);
 
     ASSERT_EQ(properties_to_test->getProperty(property_name_with_preceding_slash),
-        fep3::DefaultPropertyTypeConversion<T>::toString(initial_value));
+        fep3::base::DefaultPropertyTypeConversion<T>::toString(initial_value));
 
     ASSERT_EQ(properties_to_test->getPropertyType(property_name_with_preceding_slash),
-        fep3::PropertyType<T>::getTypeName());
+        fep3::base::PropertyType<T>::getTypeName());
 
     ASSERT_TRUE(properties_to_test->setProperty(property_name_with_preceding_slash,
-        fep3::DefaultPropertyTypeConversion<T>::toString(value),
-        fep3::PropertyType<T>::getTypeName()));
+        fep3::base::DefaultPropertyTypeConversion<T>::toString(value),
+        fep3::base::PropertyType<T>::getTypeName()));
 
     ASSERT_EQ(properties_to_test->getProperty(property_name_with_preceding_slash),
-        fep3::DefaultPropertyTypeConversion<T>::toString(value));
+        fep3::base::DefaultPropertyTypeConversion<T>::toString(value));
 }
 

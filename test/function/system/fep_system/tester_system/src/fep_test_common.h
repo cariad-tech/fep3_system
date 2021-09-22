@@ -1,24 +1,22 @@
 /**
- * Implementation of common auxiliary classes used by most of the FEP functional
- * test cases!
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
 #ifndef _FEP_TEST_COMMON_H_INC_
 #define _FEP_TEST_COMMON_H_INC_
@@ -81,7 +79,7 @@ static const std::string makePlatformDepName(const char* strOrigName)
 
 struct TestElement : public fep3::core::ElementBase
 {
-    TestElement() 
+    TestElement()
         : fep3::core::ElementBase(makePlatformDepName("Testelement"), "3.0")
     {
     }
@@ -93,6 +91,10 @@ struct TestElement : public fep3::core::ElementBase
         _logger->logWarning("loading");
         _logger->logError("loading");
         _logger->logFatal("loading");
+
+        _data_registry = getComponents()->getComponent<fep3::IDataRegistry>();
+        _data_registry->registerDataIn("reader_1", fep3::base::StreamTypePlain<int32_t>());
+        _data_registry->registerDataOut("writer_1", fep3::base::StreamTypePlain<int64_t>());
         return {};
     }
 
@@ -116,7 +118,8 @@ struct TestElement : public fep3::core::ElementBase
         return {};
     }
 
-    std::shared_ptr<fep3::ILoggingService::ILogger> _logger;
+    std::shared_ptr<fep3::ILogger> _logger;
+    fep3::IDataRegistry* _data_registry;
     static constexpr const char* const _logger_name = "Testelement.element";
 };
 
@@ -124,7 +127,7 @@ struct PartStruct
 {
     PartStruct(PartStruct&&) = default;
     ~PartStruct() = default;
-    PartStruct(fep3::core::Participant&& part) 
+    PartStruct(fep3::core::Participant&& part)
         : _part(std::move(part)), _part_executor(_part)
     {
     }

@@ -1,5 +1,5 @@
 #
-# Copyright @ 2020 Audi AG. All rights reserved.
+# Copyright @ 2021 VW Group. All rights reserved.
 # 
 #     This Source Code Form is subject to the terms of the Mozilla
 #     Public License, v. 2.0. If a copy of the MPL was not distributed
@@ -11,12 +11,12 @@
 # 
 # You may add additional accurate notices of copyright ownership.
 # 
-
+#
 option(fep3_system_cmake_enable_functional_tests
        "Enable functional tests - requires googletest (default: OFF)" OFF)
 
 if(NOT FEP3_TESTS_INTEGRATED)
-    cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+    cmake_minimum_required(VERSION 3.17.0 FATAL_ERROR)
 
     # Disable extensions here and require the chosen CMAKE_CXX_STANDARD (coming from e.g. Conan)
     set(CMAKE_CXX_STANDARD 14)
@@ -48,7 +48,6 @@ if(NOT FEP3_TESTS_INTEGRATED)
         else()
             conan_basic_setup(TARGETS NO_OUTPUT_DIRS)
         endif()
-        set(gtest_search_mode CONFIG)
         set(fep3_system_DIR ${CONAN_FEP_SDK_SYSTEM_ROOT})
         set(fep3_participant_DIR ${CONAN_FEP_SDK_PARTICIPANT_ROOT})
     endif()
@@ -70,28 +69,7 @@ endif()
 enable_testing()
 find_package(fep3_participant_core REQUIRED CONFIG PATHS ${PARTICIPANT_LIB_DIR})
 
-find_package(GTest REQUIRED ${gtest_search_mode})
-find_package(GMock QUIET ${gtest_search_mode})
-
-if(NOT GMock_FOUND) # backup
-	get_target_property(GMOCK_LIB_DIRS GTest::GTest IMPORTED_LOCATION)
-	get_filename_component(GMOCK_LIB_DIRS ${GMOCK_LIB_DIRS} DIRECTORY)
-	# assuming gmock in the same location as gtest (hacky, I know)
-
-    add_library(GMock::GMock STATIC IMPORTED)
-	set_target_properties(GMock::GMock PROPERTIES
-	  INTERFACE_INCLUDE_DIRECTORIES "${GTEST_INCLUDE_DIRS}")
-	set_target_properties(GMock::GMock PROPERTIES
-	  IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
-	  IMPORTED_LOCATION "${GMOCK_LIB_DIRS}/gmock${CMAKE_STATIC_LIBRARY_SUFFIX}")
-
-    add_library(GMock::Main STATIC IMPORTED)
-	set_target_properties(GMock::Main PROPERTIES
-	  INTERFACE_INCLUDE_DIRECTORIES "${GTEST_INCLUDE_DIRS}")
-	set_target_properties(GMock::Main PROPERTIES
-	  IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
-	  IMPORTED_LOCATION "${GMOCK_LIB_DIRS}/gmock_main${CMAKE_STATIC_LIBRARY_SUFFIX}")
-endif()
+find_package(GTest CONFIG REQUIRED COMPONENTS gtest gtest_main gmock gmock_main)
 
 include(FEP_TEST_PRIVATE.cmake)
 

@@ -1,24 +1,22 @@
 /**
- * Implementation of the tester for the FEP Data Sample (locking)
- *
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
  /**
  * Test Case:   TestSystemLibrary
@@ -42,7 +40,7 @@
 #include <fep3/components/clock/clock_service_intf.h>
 #include <fep3/components/clock_sync/clock_sync_service_intf.h>
 #include <fep3/components/scheduler/scheduler_service_intf.h>
-#include <fep3/components/configuration/propertynode_helper.h>
+#include <fep3/base/properties/propertynode_helper.h>
 
 void addingTestParticipants(fep3::System& sys)
 {
@@ -178,9 +176,9 @@ public:
 
     }
     void onLog(std::chrono::milliseconds,
-        fep3::logging::Severity severity_level,
+        fep3::LoggerSeverity severity_level,
         const std::string& participant_name,
-        const std::string& logger_name, //depends on the Category ... 
+        const std::string& logger_name, //depends on the Category ...
         const std::string& message) override
     {
         if (!_logger_name_filter.empty())
@@ -247,8 +245,8 @@ public:
         return (current_message_final.find(message) != std::string::npos);
     }
 
-    fep3::logging::Category _category;
-    fep3::logging::Severity _severity_level;
+    fep3::Category _category;
+    fep3::LoggerSeverity _severity_level;
     std::string _participant_name;
     std::string _message;
     std::string _logger_name;
@@ -270,7 +268,7 @@ AEV_TEST(SystemLibrary, SystemWithStandaloneParticipantCanNotBeStarted, "")
     const std::string sys_name = makePlatformDepName("system_under_test");
     const auto participant_names = std::vector<std::string>{ "participant1", "participant2" };
     const auto test_parts = createTestParticipants(participant_names, sys_name);
-        
+
     ASSERT_EQ(
         modules.begin()->second->GetPropertyTree()->SetPropertyValue(FEP_STM_STANDALONE_PATH, true),
         a_util::result::Result());
@@ -286,7 +284,7 @@ TEST(SystemLibrary, TestConfigureSystemOK)
 {
     const std::string sys_name = makePlatformDepName("system_under_test");
     const std::string part_name = "participant1";
-    
+
     const auto participant_names = std::vector<std::string>{ part_name };
     const auto test_parts = createTestParticipants(participant_names, sys_name);
 
@@ -327,7 +325,7 @@ TEST(SystemLibrary, TestConfigureSystemNOK)
         ASSERT_TRUE(caught);
 
         ASSERT_TRUE(fep3::rpc::arya::IRPCParticipantStateMachine::State::undefined == my_sys.getSystemState()._state);
-      
+
     }
 }
 
@@ -360,27 +358,13 @@ TEST(SystemLibrary, TestControlSystemOK)
         check_p1.setAdditionalInfo("my_value", "this is the information i want");
         ASSERT_EQ(check_p1.getAdditionalInfo("my_value", ""), "this is the information i want");
         ASSERT_EQ(check_p1.getAdditionalInfo("my_value_does_not_exist_using_default", "does not exist"), "does not exist");
-        
+
 
         auto state1 = p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState();
         auto p2 = my_sys.getParticipant(part_name_2);
         auto state2 = p2.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState();
         ASSERT_EQ(state1, fep3::rpc::ParticipantState::running);
         ASSERT_EQ(state2, fep3::rpc::ParticipantState::running);
-
-        // stop system
-        my_sys.stop();
-        state1 = p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState();
-        state2 = p2.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState();
-        ASSERT_EQ(state1, fep3::rpc::ParticipantState::initialized);
-        ASSERT_EQ(state2, fep3::rpc::ParticipantState::initialized);
-
-        // pause system
-        my_sys.pause();
-        state1 = p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState();
-        state2 = p2.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState();
-        ASSERT_EQ(state1, fep3::rpc::ParticipantState::paused);
-        ASSERT_EQ(state2, fep3::rpc::ParticipantState::paused);
 
         // stop system
         my_sys.stop();
@@ -450,7 +434,7 @@ TEST(SystemLibrary, TestControlSystemNOK)
         // but logging message
         ASSERT_TRUE(tem.waitForDone());
         ASSERT_TRUE(tem._message.find("No participant has a statemachine") != std::string::npos);
-        ASSERT_TRUE(tem._severity_level == fep3::logging::Severity::error);
+        ASSERT_TRUE(tem._severity_level == fep3::LoggerSeverity::error);
         my_sys.unregisterMonitoring(tem);
     }
 }
@@ -461,7 +445,7 @@ TEST(SystemLibrary, TestMonitorSystemOK)
     const std::string part_name_1 = "participant1";
 
     const auto participant_names = std::vector<std::string>{ part_name_1 };
-    
+
     // testing state monitor and log function
     {
         auto test_parts = createTestParticipants(participant_names, sys_name);
@@ -469,7 +453,7 @@ TEST(SystemLibrary, TestMonitorSystemOK)
         fep3::System my_sys(sys_name);
         my_sys.registerMonitoring(tem);
         my_sys.add(part_name_1);
-        
+
         my_sys.load();
 
         my_sys.setSystemState(fep3::System::AggregatedState::running);
@@ -480,14 +464,14 @@ TEST(SystemLibrary, TestMonitorSystemOK)
         ASSERT_TRUE(tem._participant_name.find(part_name_1) != std::string::npos);
         ASSERT_TRUE(tem._message.find("Successfully start") != std::string::npos);
 
-        my_sys.setSystemState(fep3::System::AggregatedState::paused);
+        my_sys.setSystemState(fep3::System::AggregatedState::initialized);
 
-        EXPECT_TRUE(tem.waitFor("Successfully pausing", 5000));
-        ASSERT_TRUE(tem._message.find("Successfully pausing") != std::string::npos);
+        EXPECT_TRUE(tem.waitFor("Successfully stop", 5000));
+        ASSERT_TRUE(tem._message.find("Successfully stop") != std::string::npos);
 
-        // unregister monitoring is important! 
+        // unregister monitoring is important!
         my_sys.unregisterMonitoring(tem);
-       
+
     }
 }
 
@@ -528,7 +512,7 @@ TEST(SystemLibrary, TestGetAClock)
             my_sys.setSystemState(fep3::System::AggregatedState::initialized);
             my_sys.setSystemState(fep3::System::AggregatedState::running);
             );
-        
+
         auto part1 = my_sys.getParticipant(part_name_1).getRPCComponentProxyByIID<fep3::rpc::IRPCClockService>();
         auto time_part1 = part1->getTime("");
         auto part2 = my_sys.getParticipant(part_name_2).getRPCComponentProxyByIID<fep3::rpc::IRPCClockService>();
@@ -538,7 +522,7 @@ TEST(SystemLibrary, TestGetAClock)
 
         my_sys.setSystemState(fep3::System::AggregatedState::unloaded);
 
-        // unregister monitoring is important! 
+        // unregister monitoring is important!
         my_sys.unregisterMonitoring(tem);
 
     }
@@ -559,14 +543,14 @@ TEST(SystemLibrary, getTimingPropertiesRealTime)
     auto props_part = my_sys.getParticipant(part_name).getRPCComponentProxyByIID<fep3::rpc::IRPCConfiguration>()->getProperties("/");
 
     // equivalent of configureTiming3NoMaster
-    const std::string string_type = fep3::PropertyType<std::string>::getTypeName();
-    
+    const std::string string_type = fep3::base::PropertyType<std::string>::getTypeName();
+
     props_part->setProperty(FEP3_CLOCK_SERVICE_MAIN_CLOCK, FEP3_CLOCK_LOCAL_SYSTEM_REAL_TIME, string_type);
     props_part->setProperty(FEP3_SCHEDULER_SERVICE_SCHEDULER, FEP3_SCHEDULER_CLOCK_BASED, string_type);
 
     auto timing_properties = my_sys.getTimingProperties();
     ASSERT_EQ(timing_properties.size(), 1u);
-    
+
     auto participant_iterator = timing_properties.begin();
     EXPECT_EQ(participant_iterator->first, "participant");
 
@@ -601,16 +585,17 @@ TEST(SystemLibrary, getTimingPropertiesAFAP)
     auto props_master = my_sys.getParticipant(master_part_name).getRPCComponentProxyByIID<fep3::rpc::IRPCConfiguration>()->getProperties("/");
     auto props_slave = my_sys.getParticipant(slave_part_name).getRPCComponentProxyByIID<fep3::rpc::IRPCConfiguration>()->getProperties("/");
 
-    const std::string string_type = fep3::PropertyType<std::string>::getTypeName();
-    const std::string double_type = fep3::PropertyType<double>::getTypeName();
-    const std::string int32_type = fep3::PropertyType<int32_t>::getTypeName();
+    const std::string string_type = fep3::base::PropertyType<std::string>::getTypeName();
+    const std::string double_type = fep3::base::PropertyType<double>::getTypeName();
+    const std::string int32_type = fep3::base::PropertyType<int32_t>::getTypeName();
+    const std::string int64_type = fep3::base::PropertyType<int64_t>::getTypeName();
 
     // equivalent of configureTiming3AFAP("timing_master", "50")
     props_master->setProperty(FEP3_CLOCKSYNC_SERVICE_CONFIG_TIMING_MASTER, master_part_name, string_type);
     props_master->setProperty(FEP3_SCHEDULER_SERVICE_SCHEDULER, FEP3_SCHEDULER_CLOCK_BASED, string_type);
     props_master->setProperty(FEP3_CLOCK_SERVICE_MAIN_CLOCK, FEP3_CLOCK_LOCAL_SYSTEM_SIM_TIME, string_type);
     props_master->setProperty(FEP3_CLOCK_SERVICE_CLOCK_SIM_TIME_TIME_FACTOR, "0.0", double_type);
-    props_master->setProperty(FEP3_CLOCK_SERVICE_CLOCK_SIM_TIME_CYCLE_TIME, "50", int32_type);
+    props_master->setProperty(FEP3_CLOCK_SERVICE_CLOCK_SIM_TIME_STEP_SIZE, "50000000", int64_type);
 
     props_slave->setProperty(FEP3_CLOCKSYNC_SERVICE_CONFIG_TIMING_MASTER, master_part_name, string_type);
     props_slave->setProperty(FEP3_SCHEDULER_SERVICE_SCHEDULER, FEP3_SCHEDULER_CLOCK_BASED, string_type);
@@ -625,7 +610,7 @@ TEST(SystemLibrary, getTimingPropertiesAFAP)
     const fep3::arya::IProperties& master_properties = *master_iterator->second;
     auto master_property_names = master_properties.getPropertyNames();
     std::vector<std::string> expected_master_property_names = { FEP3_TIMING_MASTER_PROPERTY, FEP3_SCHEDULER_PROPERTY,
-        FEP3_MAIN_CLOCK_PROPERTY, FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY, FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY,
+        FEP3_MAIN_CLOCK_PROPERTY, FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY, FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY,
         FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY, FEP3_TIME_UPDATE_TIMEOUT_PROPERTY };
 
     std::sort(master_property_names.begin(), master_property_names.end());
@@ -644,14 +629,14 @@ TEST(SystemLibrary, getTimingPropertiesAFAP)
     EXPECT_EQ(master_properties.getProperty(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY), "0.0");
     EXPECT_EQ(master_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY), double_type);
 
-    EXPECT_EQ(master_properties.getProperty(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY), "50");
-    EXPECT_EQ(master_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY), int32_type);
+    EXPECT_EQ(master_properties.getProperty(FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY), "50000000");
+    EXPECT_EQ(master_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY), int64_type);
 
     EXPECT_EQ(master_properties.getProperty(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), std::to_string(FEP3_SLAVE_SYNC_CYCLE_TIME_DEFAULT_VALUE));
-    EXPECT_EQ(master_properties.getPropertyType(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), int32_type);
+    EXPECT_EQ(master_properties.getPropertyType(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), int64_type);
 
     EXPECT_EQ(master_properties.getProperty(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), std::to_string(FEP3_TIME_UPDATE_TIMEOUT_DEFAULT_VALUE));
-    EXPECT_EQ(master_properties.getPropertyType(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), int32_type);
+    EXPECT_EQ(master_properties.getPropertyType(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), int64_type);
 
     auto slave_iterator = std::next(timing_properties.begin());
     EXPECT_EQ(slave_iterator->first, slave_part_name);
@@ -659,7 +644,7 @@ TEST(SystemLibrary, getTimingPropertiesAFAP)
     const fep3::arya::IProperties& slave_properties = *slave_iterator->second;
     auto slave_property_names = slave_properties.getPropertyNames();
     std::vector<std::string> expected_slave_property_names = { FEP3_TIMING_MASTER_PROPERTY, FEP3_SCHEDULER_PROPERTY,
-        FEP3_MAIN_CLOCK_PROPERTY, FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY, FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY,
+        FEP3_MAIN_CLOCK_PROPERTY, FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY, FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY,
         FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY, FEP3_TIME_UPDATE_TIMEOUT_PROPERTY };
 
     std::sort(slave_property_names.begin(), slave_property_names.end());
@@ -678,14 +663,14 @@ TEST(SystemLibrary, getTimingPropertiesAFAP)
     EXPECT_EQ(slave_properties.getProperty(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY), std::to_string(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_DEFAULT_VALUE));
     EXPECT_EQ(slave_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY), double_type);
 
-    EXPECT_EQ(slave_properties.getProperty(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY), std::to_string(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_DEFAULT_VALUE));
-    EXPECT_EQ(slave_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY), int32_type);
+    EXPECT_EQ(slave_properties.getProperty(FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY), std::to_string(FEP3_CLOCK_SIM_TIME_STEP_SIZE_DEFAULT_VALUE));
+    EXPECT_EQ(slave_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY), int64_type);
 
     EXPECT_EQ(slave_properties.getProperty(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), std::to_string(FEP3_SLAVE_SYNC_CYCLE_TIME_DEFAULT_VALUE));
-    EXPECT_EQ(slave_properties.getPropertyType(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), int32_type);
+    EXPECT_EQ(slave_properties.getPropertyType(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), int64_type);
 
     EXPECT_EQ(slave_properties.getProperty(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), std::to_string(FEP3_TIME_UPDATE_TIMEOUT_DEFAULT_VALUE));
-    EXPECT_EQ(slave_properties.getPropertyType(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), int32_type);
+    EXPECT_EQ(slave_properties.getPropertyType(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), int64_type);
 }
 
 TEST(SystemLibrary, getTimingPropertiesDiscrete)
@@ -705,9 +690,10 @@ TEST(SystemLibrary, getTimingPropertiesDiscrete)
     auto props_master = my_sys.getParticipant(master_part_name).getRPCComponentProxyByIID<fep3::rpc::IRPCConfiguration>()->getProperties("/");
     auto props_slave = my_sys.getParticipant(slave_part_name).getRPCComponentProxyByIID<fep3::rpc::IRPCConfiguration>()->getProperties("/");
 
-    const std::string string_type = fep3::PropertyType<std::string>::getTypeName();
-    const std::string double_type = fep3::PropertyType<double>::getTypeName();
-    const std::string int32_type = fep3::PropertyType<int32_t>::getTypeName();
+    const std::string string_type = fep3::base::PropertyType<std::string>::getTypeName();
+    const std::string double_type = fep3::base::PropertyType<double>::getTypeName();
+    const std::string int32_type = fep3::base::PropertyType<int32_t>::getTypeName();
+    const std::string int64_type = fep3::base::PropertyType<int64_t>::getTypeName();
 
     // equivalent of configureTiming3ClockSyncOnlyDiscrete(master_part_name, "20")
     props_master->setProperty(FEP3_CLOCKSYNC_SERVICE_CONFIG_TIMING_MASTER, master_part_name, string_type);
@@ -717,7 +703,7 @@ TEST(SystemLibrary, getTimingPropertiesDiscrete)
     props_slave->setProperty(FEP3_CLOCKSYNC_SERVICE_CONFIG_TIMING_MASTER, master_part_name, string_type);
     props_slave->setProperty(FEP3_SCHEDULER_SERVICE_SCHEDULER, FEP3_SCHEDULER_CLOCK_BASED, string_type);
     props_slave->setProperty(FEP3_CLOCK_SERVICE_MAIN_CLOCK, FEP3_CLOCK_SLAVE_MASTER_ONDEMAND_DISCRETE, string_type);
-    props_slave->setProperty(FEP3_CLOCKSYNC_SERVICE_CONFIG_SLAVE_SYNC_CYCLE_TIME,"20" , int32_type);
+    props_slave->setProperty(FEP3_CLOCKSYNC_SERVICE_CONFIG_SLAVE_SYNC_CYCLE_TIME,"20000000" , int64_type);
 
     auto timing_properties = my_sys.getTimingProperties();
     ASSERT_EQ(timing_properties.size(), 2u);
@@ -728,7 +714,7 @@ TEST(SystemLibrary, getTimingPropertiesDiscrete)
     const fep3::arya::IProperties& master_properties = *master_iterator->second;
     auto master_property_names = master_properties.getPropertyNames();
     std::vector<std::string> expected_master_property_names = { FEP3_TIMING_MASTER_PROPERTY, FEP3_SCHEDULER_PROPERTY,
-        FEP3_MAIN_CLOCK_PROPERTY, FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY, FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY,
+        FEP3_MAIN_CLOCK_PROPERTY, FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY, FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY,
         FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY, FEP3_TIME_UPDATE_TIMEOUT_PROPERTY };
 
     std::sort(master_property_names.begin(), master_property_names.end());
@@ -747,14 +733,14 @@ TEST(SystemLibrary, getTimingPropertiesDiscrete)
     EXPECT_EQ(master_properties.getProperty(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY), std::to_string(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_DEFAULT_VALUE));
     EXPECT_EQ(master_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY), double_type);
 
-    EXPECT_EQ(master_properties.getProperty(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY), std::to_string(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_DEFAULT_VALUE));
-    EXPECT_EQ(master_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY), int32_type);
+    EXPECT_EQ(master_properties.getProperty(FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY), std::to_string(FEP3_CLOCK_SIM_TIME_STEP_SIZE_DEFAULT_VALUE));
+    EXPECT_EQ(master_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY), int64_type);
 
     EXPECT_EQ(master_properties.getProperty(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), std::to_string(FEP3_SLAVE_SYNC_CYCLE_TIME_DEFAULT_VALUE));
-    EXPECT_EQ(master_properties.getPropertyType(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), int32_type);
+    EXPECT_EQ(master_properties.getPropertyType(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), int64_type);
 
     EXPECT_EQ(master_properties.getProperty(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), std::to_string(FEP3_TIME_UPDATE_TIMEOUT_DEFAULT_VALUE));
-    EXPECT_EQ(master_properties.getPropertyType(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), int32_type);
+    EXPECT_EQ(master_properties.getPropertyType(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), int64_type);
 
     auto slave_iterator = std::next(timing_properties.begin());
     EXPECT_EQ(slave_iterator->first, slave_part_name);
@@ -762,7 +748,7 @@ TEST(SystemLibrary, getTimingPropertiesDiscrete)
     const fep3::arya::IProperties& slave_properties = *slave_iterator->second;
     auto slave_property_names = slave_properties.getPropertyNames();
     std::vector<std::string> expected_slave_property_names = { FEP3_TIMING_MASTER_PROPERTY, FEP3_SCHEDULER_PROPERTY,
-        FEP3_MAIN_CLOCK_PROPERTY, FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY, FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY,
+        FEP3_MAIN_CLOCK_PROPERTY, FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY, FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY,
         FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY, FEP3_TIME_UPDATE_TIMEOUT_PROPERTY };
 
     std::sort(slave_property_names.begin(), slave_property_names.end());
@@ -781,12 +767,12 @@ TEST(SystemLibrary, getTimingPropertiesDiscrete)
     EXPECT_EQ(slave_properties.getProperty(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY), std::to_string(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_DEFAULT_VALUE));
     EXPECT_EQ(slave_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_TIME_FACTOR_PROPERTY), double_type);
 
-    EXPECT_EQ(slave_properties.getProperty(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY), std::to_string(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_DEFAULT_VALUE));
-    EXPECT_EQ(slave_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_CYCLE_TIME_PROPERTY), int32_type);
+    EXPECT_EQ(slave_properties.getProperty(FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY), std::to_string(FEP3_CLOCK_SIM_TIME_STEP_SIZE_DEFAULT_VALUE));
+    EXPECT_EQ(slave_properties.getPropertyType(FEP3_CLOCK_SIM_TIME_STEP_SIZE_PROPERTY), int64_type);
 
-    EXPECT_EQ(slave_properties.getProperty(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), "20");
-    EXPECT_EQ(slave_properties.getPropertyType(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), int32_type);
+    EXPECT_EQ(slave_properties.getProperty(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), "20000000");
+    EXPECT_EQ(slave_properties.getPropertyType(FEP3_SLAVE_SYNC_CYCLE_TIME_PROPERTY), int64_type);
 
     EXPECT_EQ(slave_properties.getProperty(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), std::to_string(FEP3_TIME_UPDATE_TIMEOUT_DEFAULT_VALUE));
-    EXPECT_EQ(slave_properties.getPropertyType(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), int32_type);
+    EXPECT_EQ(slave_properties.getPropertyType(FEP3_TIME_UPDATE_TIMEOUT_PROPERTY), int64_type);
 }

@@ -1,26 +1,28 @@
 /**
  * @file
+ * @copyright
+ * @verbatim
+Copyright @ 2021 VW Group. All rights reserved.
 
-   @copyright
-   @verbatim
-   Copyright @ 2020 Audi AG. All rights reserved.
-   
-       This Source Code Form is subject to the terms of the Mozilla
-       Public License, v. 2.0. If a copy of the MPL was not distributed
-       with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   If it is not possible or desirable to put the notice in a particular file, then
-   You may include the notice in a location (such as a LICENSE file in a
-   relevant directory) where a recipient would be likely to look for such a notice.
-   
-   You may add additional accurate notices of copyright ownership.
-   @endverbatim 
- *
+    This Source Code Form is subject to the terms of the Mozilla
+    Public License, v. 2.0. If a copy of the MPL was not distributed
+    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file, then
+You may include the notice in a location (such as a LICENSE file in a
+relevant directory) where a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+@endverbatim
  */
+
 
 #pragma once
 #include <string>
 #include "a_util/datetime.h"
+#include "a_util/strings/strings_convert.h"
+#include "a_util/strings/strings_functions.h"
 #include "fep_system/system_logger_intf.h"
 
 #include "rpc_services/logging/logging_rpc_intf.h"
@@ -50,7 +52,7 @@ namespace fep3
         {
             _system_logger.log(
                 std::chrono::milliseconds(a_util::strings::toInt64(timestamp)),
-                static_cast<logging::Severity>(severity),
+                static_cast<LoggerSeverity>(severity),
                 participant,
                 logger_name,
                 description);
@@ -58,14 +60,14 @@ namespace fep3
         }
     };
 
-    class SystemLogger : 
+    class SystemLogger :
         public ISystemLogger
     {
     public:
         SystemLogger()
         {
         }
-        
+
         void registerMonitor(IEventMonitor* monitor)
         {
             std::lock_guard<std::recursive_mutex> _lock(_synch_event_monitor);
@@ -79,9 +81,9 @@ namespace fep3
         }
 
         void log(const std::chrono::milliseconds& time_as_ms,
-            logging::Severity level,
+            LoggerSeverity level,
             const std::string& participant_name,
-            const std::string& logger_name, //depends on the Category ... 
+            const std::string& logger_name, //depends on the Category ...
             const std::string& message) const
         {
             std::lock_guard<std::recursive_mutex> _lock(_synch_event_monitor);
@@ -91,9 +93,9 @@ namespace fep3
             }
         }
         void log(
-            logging::Severity level,
+            LoggerSeverity level,
             const std::string& participant_name,
-            const std::string& logger_name, //depends on the Category ... 
+            const std::string& logger_name, //depends on the Category ...
             const std::string& message) const
         {
             auto log_time_point = std::chrono::system_clock::now();
@@ -101,14 +103,14 @@ namespace fep3
             log(time_as_ms, level, participant_name, logger_name, message);
         }
 
-        void setSeverityLevel(logging::Severity level)
+        void setSeverityLevel(LoggerSeverity level)
         {
             _level = level;
         }
 
         void initRPCService(const std::string& system_name)
         {
-            //we create an service bus connection without appaering as server that is discoverable
+            //we create an service bus connection without appearing as server that is discoverable
             //so use a separate one!
             _servicebus_connection = ServiceBusFactory::get().createOrGetServiceBusConnection(system_name, "");
             if (!_servicebus_connection)
@@ -143,12 +145,12 @@ namespace fep3
 
         std::string getUrl() const
         {
-            if (_system_access)
+            if (_system_access && _system_access->getServer())
             {
                 auto url = _system_access->getServer()->getUrl();
                 if (url.find("http://0.0.0.0:") != std::string::npos)
                 {
-                    //this is a replacement for beta 
+                    //this is a replacement for beta
                     a_util::strings::replace(url, "0.0.0.0", a_util::system::getHostname());
                 }
                 return url;
@@ -164,12 +166,12 @@ namespace fep3
             return counter++;
         }
 
-        logging::Severity _level = logging::Severity::info;
+        LoggerSeverity _level = LoggerSeverity::info;
         IEventMonitor* _monitor = nullptr;
         mutable std::recursive_mutex _synch_event_monitor;
         std::shared_ptr<arya::IServiceBus::ISystemAccess> _system_access;
         std::shared_ptr<arya::IServiceBusConnection> _servicebus_connection;
         std::shared_ptr<LogSinkImpl> _log_sink_impl;
-        
+
     };
 }

@@ -1,39 +1,22 @@
+# Copyright @ 2021 VW Group. All rights reserved.
+#
+#     This Source Code Form is subject to the terms of the Mozilla
+#     Public License, v. 2.0. If a copy of the MPL was not distributed
+#     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# If it is not possible or desirable to put the notice in a particular file, then
+# You may include the notice in a location (such as a LICENSE file in a
+# relevant directory) where a recipient would be likely to look for such a notice.
+#
+# You may add additional accurate notices of copyright ownership.
+
 common:
     files:
         - fep3_system-config.cmake
         - fep3_system-config-version.cmake
         - fep3_system-macros.cmake
         - README.md
-        - doc/license/used/a_util/MPL2.0.txt
-        - doc/license/used/a_util/licenses.txt
-        - doc/license/used/a_util/used_oss.md
-        - doc/license/used/ddl/MPL2.0.txt
-        - doc/license/used/ddl/mpl.md
-        - doc/license/used/ddl/used_licenses.md
-        - doc/license/used/ddl/used_licenses/a_util/MPL2.0.txt
-        - doc/license/used/ddl/used_licenses/a_util/licenses.txt
-        - doc/license/used/ddl/used_licenses/a_util/used_oss.md
-        - doc/license/used/ddl/used_licenses/list_used_licenses.md
-        - doc/license/used/fep_sdk_participant/used/a_util/MPL2.0.txt
-        - doc/license/used/fep_sdk_participant/used/a_util/licenses.txt
-        - doc/license/used/fep_sdk_participant/used/a_util/used_oss.md
-        - doc/license/used/fep_sdk_participant/used/ddl/MPL2.0.txt
-        - doc/license/used/fep_sdk_participant/used/ddl/mpl.md
-        - doc/license/used/fep_sdk_participant/used/ddl/used_licenses.md
-        - doc/license/used/fep_sdk_participant/used/ddl/used_licenses/a_util/MPL2.0.txt
-        - doc/license/used/fep_sdk_participant/used/ddl/used_licenses/a_util/licenses.txt
-        - doc/license/used/fep_sdk_participant/used/ddl/used_licenses/a_util/used_oss.md
-        - doc/license/used/fep_sdk_participant/used/ddl/used_licenses/list_used_licenses.md
-        - doc/license/used/fep_sdk_participant/used/rti_connext_dds/real-time_innovations_inc_software_license_agreement.md
-        - doc/license/used/fep_sdk_participant/used/pkg_rpc/MPL2.0.txt
-        - doc/license/used/fep_sdk_participant/used/pkg_rpc/licenses.txt
-        - doc/license/used/fep_sdk_participant/used/pkg_rpc/used_licenses/a_util/MPL2.0.txt
-        - doc/license/used/fep_sdk_participant/used/pkg_rpc/used_licenses/a_util/licenses.txt
-        - doc/license/used/fep_sdk_participant/used/pkg_rpc/used_licenses/a_util/used_oss.md
-        - doc/license/used/fep_sdk_participant/used/pkg_rpc/used_licenses/list_used_licenses.md
-        - doc/license/used/fep_sdk_participant/CONTRIBUTING.md
-        - doc/license/used/fep_sdk_participant/MPL2.0.txt
-        - doc/license/used/fep_sdk_participant/mpl.md
+        - doc/license/used_licenses/.+
         - include/fep_system/fep_system_version.h
         - include/fep_system/fep_system.h
         - include/fep_system/fep_system_export.h
@@ -43,17 +26,15 @@ common:
         - include/fep_system/system_logger_intf.h
         - include/fep_system/event_monitor_intf.h
         - include/fep_system/logging_types_legacy.h
+        - include/fep_system/base/health/health_types.h
         - include/fep_system/base/logging/logging_types.h
-        - include/fep_system/base/properties/properties.h
         - include/fep_system/base/properties/properties_intf.h
-        - include/fep_system/base/properties/property_type.h
-        - include/fep_system/base/properties/property_type_conversion.h
-        - include/fep_system/base/streamtype/default_streamtype.h
-        - include/fep_system/base/streamtype/streamtype.h
-        - include/fep_system/base/streamtype/streamtype_intf.h
+        - include/fep_system/base/stream_type/stream_type_intf.h
         - include/fep_system/rpc_services/configuration/configuration_rpc_intf.h
         - include/fep_system/rpc_services/data_registry/data_registry_rpc_intf.h
         - include/fep_system/rpc_services/data_registry/data_registry_rpc_intf_def.h
+        - include/fep_system/rpc_services/health/health_service_rpc_intf.h
+        - include/fep_system/rpc_services/health/health_service_rpc_intf_def.h
         - include/fep_system/rpc_services/participant_statemachine/participant_statemachine_rpc_intf.h
         - include/fep_system/rpc_services/participant_statemachine/participant_statemachine_rpc_intf_def.h
         - include/fep_system/rpc_services/participant_info/participant_info_rpc_intf.h
@@ -66,6 +47,7 @@ common:
         - include/fep_system/rpc_services/configuration/configuration_rpc_intf_def.h
         - include/fep_system/rpc_services/clock/clock_service_rpc_intf_def.h
         - include/fep_system/rpc_services/clock/clock_service_rpc_intf.h
+        - include/fep_system/rpc_services/rpc_passthrough/rpc_passthrough_intf.h
         - lib/cmake/fep3_system_targets.cmake
         - lib/fep3_system.plugins
         - lib/cmake/fep3_http_service_bus_targets.cmake
@@ -90,6 +72,16 @@ linux_shared_release:
         - lib/cmake/fep3_system_targets-release.cmake
         - lib/cmake/fep3_http_service_bus_targets-release.cmake
 
+linux_shared_relWithdebInfo:
+    conditions:
+        my_conds:
+            os: Linux
+            build_type: RelWithDebInfo
+    files:
+        - lib/libfep3_system3.0.so
+        - lib/cmake/fep3_system_targets-relwithdebinfo.cmake
+        - lib/cmake/fep3_http_service_bus_targets-relwithdebinfo.cmake
+
 linux_shared:
     conditions:
         my_conds:
@@ -106,9 +98,10 @@ windows_shared_debug:
         - lib/fep3_systemd3.0.dll
         - lib/fep3_systemd3.0.lib
         - lib/fep3_systemd3.0.pdb
+        - lib/http/fep3_http_service_bus.pdb
         - lib/cmake/fep3_system_targets-debug.cmake
         - lib/cmake/fep3_http_service_bus_targets-debug.cmake
-  
+
 windows_shared_release:
     conditions:
         my_conds:
@@ -136,4 +129,19 @@ documentation:
             arch: x86_64
     files:
         - doc/changelog.md
-        - doc/html/*
+        - doc/html/.+\.css
+        - doc/html/.+\.doctree
+        - doc/html/.+\.eot
+        - doc/html/.+\.html
+        - doc/html/.+\.js
+        - doc/html/.+\.png
+        - doc/html/.+\.svg
+        - doc/html/.+\.ttf
+        - doc/html/.+\.woff
+        - doc/html/.+\.woff2
+        - doc/html/.+\.pickle
+        - doc/html/.+\.txt
+        - doc/html/.+\.inv
+        - doc/html/.+\.ico
+        - doc/html/\.buildinfo
+        - LICENSE

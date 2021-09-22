@@ -1,0 +1,7 @@
+[
+  // Notifies the event listener
+  {
+    "name": "notify",
+    "returns": 0 // notification success
+  }
+]
