@@ -60,7 +60,7 @@ public:
      *
      * @param[in] logger_name       The logger name / domain to get the current set filter for
      *
-     * @return returns the configured loggerfilter if found. otherwise it is empty.
+     * @return returns the configured logger filter if found. otherwise it is empty.
      */
     virtual LoggerFilter getLoggerFilter(const std::string& logger_name) const = 0;
 
@@ -90,7 +90,7 @@ public:
 
 /**
  * The RPC Logging Sink Service interface provide functionality to register and unregister
- * a server address where the log messages can be send to.
+ * a server address where the log messages can be sent to.
  *
  */
 class IRPCLoggingSinkService : public IRPCLoggingSinkServiceDef
@@ -112,7 +112,7 @@ public:
     /**
     * @brief unregisters the address from the service to stop sending log messages to that address
     *
-    * @param[in] url valid url where the messages was sent to
+    * @param[in] url valid url where the messages were sent to
     *
     * @return returns 0 if succeeded
     */

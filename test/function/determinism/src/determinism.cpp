@@ -109,6 +109,12 @@ TEST(Determinism, RegularOnTime)
     for (std::string line : text_lines)
     {
         std::vector<std::string> data = a_util::strings::split(line, " ");
+        // in case we receive an empty line or non complete line
+        if (data.size() < 2)
+        {
+            continue;
+        }
+
         if (a_util::strings::toInt32(data[1]) == 0) // No signals can be received in the first simulation time step
         {
             expected_values_file << "0 0 0 0 0" << std::endl;

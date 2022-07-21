@@ -60,12 +60,12 @@ public:
     };
     /**
      * retrieves the list of the names of all registered clocks of the corresponding participant
-     * @return comma seperated list of the names of all registered clocks
+     * @return comma separated list of the names of all registered clocks
      */
     virtual std::vector<std::string> getClockNames() const = 0;
 
     /**
-     * retrieves the names of the current main clock configured out of the registered clocknames
+     * retrieves the names of the current main clock configured out of the registered clock names
      * @return the name of all main clock
      */
     virtual std::string getMainClockName() const = 0;
@@ -75,7 +75,7 @@ public:
      * if clock_name is empty it will return the time of the current getMainClockName
      *
      * @param[in] clock_name name of the clock to retrieve the current time from
-     * @return value of the time in nanosec resolution
+     * @return value of the time in nano sec resolution
      * @retval -1 if the clock does not exist
      */
     virtual int64_t getTime(const std::string& clock_name) const = 0;

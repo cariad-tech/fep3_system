@@ -11,6 +11,8 @@
 # You may add additional accurate notices of copyright ownership.
 
 find_package(dev_essential REQUIRED COMPONENTS date_time system process strings xml pkg_rpc)
+# For boost asio
+find_package(Boost 1.73.0 REQUIRED)
 
 # fep system library
 set(SYSTEM_SOURCES_PUBLIC
@@ -297,6 +299,7 @@ target_link_libraries(${FEP3_SYSTEM_LIBRARY}
         dev_essential::strings
         dev_essential::xml
         dev_essential::pkg_rpc
+        Boost::disable_autolinking
     PUBLIC
         ${BUILD_LIBRARY_FLAGS}
 
@@ -305,7 +308,11 @@ target_link_libraries(${FEP3_SYSTEM_LIBRARY}
 target_include_directories(${FEP3_SYSTEM_LIBRARY} PUBLIC
     "$<BUILD_INTERFACE:${BUILD_INTERFACE_INCLUDES}>"
     "$<INSTALL_INTERFACE:${INSTALL_INTERFACE_INCLUDES}>"
+    PRIVATE
+    ${Boost_INCLUDE_DIRS}
 )
+target_compile_features(${FEP3_SYSTEM_LIBRARY} PUBLIC cxx_std_${CMAKE_CXX_STANDARD})
+
 #install base types needed within the interfaces
 install(FILES ${SYSTEM_EXT_PUBLIC_SOURCES_RPC} DESTINATION include/fep_system/rpc_services/base)
 install(FILES ${SYSTEM_EXT_PUBLIC_SOURCES_LOGGING_BASE} DESTINATION include/fep_system/base/logging)

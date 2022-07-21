@@ -37,6 +37,9 @@ You may add additional accurate notices of copyright ownership.
 
 #define FEP_PREP_CMD_VERSION 1.0
 #define FEP_PREP_REMOTE_PROP_TIMEOUT static_cast<timestamp_t>(5e6)
+#define XSTR(x) STR(x)
+#define STR(x) #x
+#define ABC 123
 
 #ifdef WIN32
     #pragma warning( push )
@@ -54,14 +57,10 @@ static const std::string makePlatformDepName(const char* strOrigName)
 {
     std::string strModuleNameDep(strOrigName);
 
-    //strModuleNameDep.append(cTime::GetCurrentSystemTime().format("_%H%M%S"));
-
-    #if (_MSC_VER == 1600)
-        strModuleNameDep.append("_win64_vc100");
-    #elif (_MSC_VER == 1900)
-        strModuleNameDep.append("_win64_vc140");
-    #elif (_MSC_VER >= 1910 && _MSC_VER < 1920)
+    #if (_MSC_VER < 1920)
         strModuleNameDep.append("_win64_vc141");
+    #elif (_MSC_VER >= 1920)
+        strModuleNameDep.append("_win64_vc142");
     #elif (defined (__linux))
         strModuleNameDep.append("_linux");
     #else

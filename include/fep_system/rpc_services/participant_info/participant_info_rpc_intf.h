@@ -80,7 +80,7 @@ public:
      *
      * @param[in] rpc_component_name the component name to get the interface definition from
      * @param[in] rpc_component_iid the interface id to get the interface definition of
-     * @return std::string the interface definiton as string
+     * @return std::string the interface definition as string
      * @throw runtime_error if timeout occurred
      */
     virtual std::string getRPCComponentInterfaceDefinition(const std::string& rpc_component_name,

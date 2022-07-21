@@ -34,7 +34,7 @@ You may add additional accurate notices of copyright ownership.
 #define FEP3_CONFIG_LOG_RESULT(_res_, _participant_name_, _component_name_, _method_, _path_) { \
 _logger.log(LoggerSeverity::error, _participant_name_, \
 _component_name_, \
-a_util::strings::format("Can not %s '%s' due to following error : (%d - %s)  ", \
+a_util::strings::format("Can not %s '%s' due to following error : (%d - %s - %s)  ", \
     _method_.c_str(), \
     _path_.c_str(), \
     _res_.getErrorCode(), \
@@ -43,7 +43,11 @@ a_util::strings::format("Can not %s '%s' due to following error : (%d - %s)  ", 
 
 #define FEP3_CONFIG_LOG_AND_THROW_RESULT(_res_, _participant_name_, _component_name_, _method_, _path_) \
 FEP3_CONFIG_LOG_RESULT(_res_, _participant_name_, _component_name_, _method_, _path_) \
-throw std::runtime_error{ "Could not execute " + _participant_name_ + "->" + _component_name_ + "->" + _method_ + " - Error: " + _res_.getErrorLabel() };
+throw std::runtime_error{ "Could not execute " + _participant_name_ \
+    + "->" + _component_name_ + \
+    "->" + _method_ + \
+    " - Error: " + _res_.getErrorLabel() \
+    + " - " + _res_.getDescription() };
 
 namespace fep3
 {
@@ -100,8 +104,12 @@ private:
             std::string path = _property_path + normalizeName(name);
             if (!isPropertyPathValid(path))
             {
-                fep3::Result result(ERR_INVALID_ARG);
-                FEP3_CONFIG_LOG_RESULT(result,
+                FEP3_CONFIG_LOG_RESULT(
+                    fep3::Result(ERR_INVALID_ARG,
+                        a_util::strings::format("Property path '%s' is invalid.", path.c_str()).c_str(),
+                        0,
+                        "",
+                        ""),
                     _participant_name,
                     _component_name,
                     std::string("setProperty"), path);
@@ -131,8 +139,12 @@ private:
             std::string path = _property_path + normalizeName(name);
             if (!isPropertyPathValid(path))
             {
-                fep3::Result result(ERR_INVALID_ARG);
-                FEP3_CONFIG_LOG_RESULT(result,
+                FEP3_CONFIG_LOG_RESULT(
+                    fep3::Result(ERR_INVALID_ARG,
+                        a_util::strings::format("Property path '%s' is invalid.", path.c_str()).c_str(),
+                        0,
+                        "",
+                        ""),
                     _participant_name,
                     _component_name,
                     std::string("getProperty"), path);
@@ -143,7 +155,12 @@ private:
                 std::string type = GetStub().getProperty(path)["type"].asString();
                 if (type.empty())
                 {
-                    FEP3_CONFIG_LOG_RESULT(fep3::Result(ERR_PATH_NOT_FOUND),
+                    FEP3_CONFIG_LOG_RESULT(
+                        fep3::Result(ERR_PATH_NOT_FOUND,
+                            a_util::strings::format("Property path '%s' does not exist.", path.c_str()).c_str(),
+                            0,
+                            "",
+                            ""),
                         _participant_name,
                         _component_name,
                         std::string("getProperty"),
@@ -315,7 +332,12 @@ public:
         }
         else
         {
-            FEP3_CONFIG_LOG_AND_THROW_RESULT(fep3::Result(ERR_PATH_NOT_FOUND),
+            FEP3_CONFIG_LOG_AND_THROW_RESULT(
+                fep3::Result(ERR_PATH_NOT_FOUND,
+                    a_util::strings::format("Property '%s' does not exist.", property_path.c_str()).c_str(),
+                    0,
+                    "",
+                    "" ),
                 _participant_name,
                 _component_name,
                 std::string("getProperties"),
@@ -342,8 +364,12 @@ public:
         }
         else
         {
-            FEP3_CONFIG_LOG_AND_THROW_RESULT(fep3::Result(ERR_PATH_NOT_FOUND),
-                _participant_name,
+            FEP3_CONFIG_LOG_AND_THROW_RESULT(
+                fep3::Result(ERR_PATH_NOT_FOUND,
+                    a_util::strings::format("Property '%s' does not exist.", property_path.c_str()).c_str(),
+                    0,
+                    "",
+                    ""), _participant_name,
                 _component_name,
                 std::string("getProperties"),
                 property_path);

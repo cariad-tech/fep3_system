@@ -29,7 +29,7 @@ namespace experimental
 {
 
 /**
-* @brief definition of the a rpc passthrough service which gives direct access to the rpc methods of aother serivce.
+* @brief definition of the a rpc passthrough service which gives direct access to the rpc methods of another service.
 */
 class IRPCPassthrough
 {

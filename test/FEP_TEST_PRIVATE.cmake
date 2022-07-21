@@ -23,3 +23,4 @@ macro(fep_add_gtest NAME TIMEOUT_S WORKING_DIRECTORY)
     set_target_properties(${NAME} PROPERTIES INSTALL_RPATH "@CMAKE_CURRENT_BINARY_DIR@/src/")
     fep_deploy_libraries(${NAME})
 endmacro()
+

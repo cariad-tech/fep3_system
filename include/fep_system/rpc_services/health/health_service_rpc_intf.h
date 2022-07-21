@@ -33,7 +33,7 @@ namespace experimental
 {
 
 /**
-* @brief definition of the external health service interface of the participan
+* @brief definition of the external health service interface of the participant
 * @see health.json file
 */
 class IRPCHealthService : public IRPCHealthServiceDef

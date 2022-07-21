@@ -40,7 +40,7 @@ public:
      *
      * @param[in] log_time time of the log
      * @param[in] severity_level severity level of the log
-     * @param[in] participant_name participant name (is empty on system category )
+     * @param[in] participant_name participant name (is empty on system category)
      * @param[in] logger_name (usually the system, participant, component or element name and category)
      * @param[in] message detailed message
      */
@@ -64,7 +64,7 @@ class EventMonitor : public IEventMonitor
 {
 public:
     /**
-     * legacy callback by state change. has no effect and ist not supported anymore.
+     * legacy callback by state change. has no effect and is not supported anymore.
      *
      */
     virtual void onStateChanged(const std::string&,
@@ -75,7 +75,7 @@ public:
     }
 
     /**
-     * legacy callback by name change. has no effect and ist not supported anymore.
+     * legacy callback by name change. has no effect and is not supported anymore.
      *
      */
     virtual void onNameChanged(const std::string&, const std::string&)
@@ -92,7 +92,7 @@ public:
      * @param[in] log_time time of the log
      * @param[in] category category of the log
      * @param[in] severity_level severity level of the log
-     * @param[in] participant_name participant name (is empty on system category )
+     * @param[in] participant_name participant name (is empty on system category)
      * @param[in] logger_name (usually the system, participant, component or element name)
      * @param[in] message detailed message
      */

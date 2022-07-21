@@ -17,7 +17,12 @@ You may add additional accurate notices of copyright ownership.
 @endverbatim
  */
 
+#include "boost/asio.hpp"
+#include <boost/range/adaptors.hpp>
+#include <boost/range/algorithm.hpp>
+#include <boost/algorithm/string/join.hpp>
 
+#include <boost/range.hpp>
 #include <fep_system/fep_system.h>
 #include <a_util/system/system.h>
 #include <service_bus_factory.h>
@@ -35,6 +40,8 @@ You may add additional accurate notices of copyright ownership.
 #include <fep3/components/scheduler/scheduler_service_intf.h>
 #include <fep3/base/properties/property_type.h>
 #include <fep3/base/properties/properties.h>
+
+const uint8_t pool_size_for_parallel_ops = 6;
 
 using namespace a_util::strings;
 namespace
@@ -202,7 +209,7 @@ namespace fep3
                     }
                     catch (const std::exception& ex)
                     {
-                        error_message += std::string(" ") + ex.what();
+                        error_message += a_util::strings::format(" Participant %s threw exception: %s.", proxy.getName().c_str(), ex.what());
                     }
                 }
             });
@@ -253,7 +260,7 @@ namespace fep3
                     }
                     catch (const std::exception& ex)
                     {
-                        error_message += std::string(" ") + ex.what();
+                        error_message += a_util::strings::format(" Participant %s threw exception: %s.", proxy.getName().c_str(), ex.what());
                     }
                 }
             });
@@ -511,9 +518,8 @@ namespace fep3
         // support the changing of it or use for every single Request
         PartStates getParticipantStates(std::chrono::milliseconds )
         {
-
             PartStates states;
-            for (auto part : _participants)
+            for (const auto& part : _participants)
             {
                 RPCComponent<rpc::arya::IRPCParticipantInfo> part_info;
                 RPCComponent<rpc::arya::IRPCParticipantStateMachine> state_machine;
@@ -621,6 +627,43 @@ namespace fep3
             _participants.clear();
         }
 
+        void addAsync(const std::multimap<std::string, std::string>& participants, uint8_t pool_size)
+        {
+            // find if we have duplicates
+            auto part_found = searchParticipant(participants, false);
+            if (part_found)
+            {
+                FEP3_SYSTEM_LOG_AND_THROW(_logger,
+                    LoggerSeverity::fatal,
+                    "",
+                    _system_name,
+                    "Try to add a participant with name "
+                    + part_found.getName() + " which already exists.");
+            }
+
+            boost::asio::thread_pool pool(pool_size);
+            //preallocate the vector
+            _participants = std::vector<ParticipantProxy>(participants.size());
+            uint32_t index = 0;
+
+            for (auto& part_to_call : participants)
+            {
+                boost::asio::post(pool,
+                    [&, index]()
+                    {
+                        // we can initialize safely in multi thread execution, each thread touches a different vector index
+                        _participants[index] = ParticipantProxy(part_to_call.first,
+                            part_to_call.second,
+                            _system_name,
+                            _system_discovery_url,
+                            _logger,
+                            PARTICIPANT_DEFAULT_TIMEOUT);
+                    });
+                ++index;
+            }
+            pool.join();
+        }
+
         void add(const std::string& participant_name, const std::string& participant_url)
         {
             auto part_found = getParticipant(participant_name, false);
@@ -678,6 +721,42 @@ namespace fep3
             }
             return {};
         }
+
+        ParticipantProxy searchParticipant(const std::multimap<std::string, std::string>& participants, bool throw_if_not_found) const
+        {
+            auto particpant_names = boost::adaptors::keys(participants);
+
+            auto part_found = std::search(
+                _participants.begin(),
+                _participants.end(),
+                particpant_names.begin(),
+                particpant_names.end(),
+                [](const ParticipantProxy & part_proxy, const std::string & part_name)
+                {
+                    return part_proxy.getName() == part_name;
+                });
+
+            if (part_found == _participants.end())
+            {
+                if (throw_if_not_found)
+                {
+                    FEP3_SYSTEM_LOG_AND_THROW(_logger,
+                        LoggerSeverity::fatal,
+                        "",
+                        _system_name,
+                        "No Participant with any of the names " + boost::algorithm::join(particpant_names, " ") + ", was found");
+                }
+                else
+                {
+                    return {};
+                }
+            }
+            else
+            {
+                return *part_found;
+            }
+        }
+
 
         std::vector<ParticipantProxy> getParticipants() const
         {
@@ -1037,6 +1116,16 @@ namespace fep3
         }
     }
 
+    void System::addAsync(const std::multimap<std::string, std::string>& participants)
+    {
+        _impl->addAsync(participants, pool_size_for_parallel_ops);
+    }
+
+    void System::addAsync(const std::multimap<std::string, std::string>& participants, uint8_t pool_size)
+    {
+        _impl->addAsync(participants, pool_size);
+    }
+
     void System::remove(const std::string& participant)
     {
         _impl->remove(participant);
@@ -1161,7 +1250,6 @@ namespace fep3
 
     System discoverSystemByURL(std::string name, std::string discover_url, std::chrono::milliseconds timeout)
     {
-        // default discover is actually DDS with domain 0
         auto my_discovery_bus = ServiceBusFactory::get().createOrGetServiceBusConnection(name,
             discover_url);
         if (my_discovery_bus)
@@ -1175,10 +1263,7 @@ namespace fep3
             }
             auto participants = sys_access->discover(timeout);
             System discovered_system(name, discover_url);
-            for (auto& part : participants)
-            {
-                discovered_system.add(part.first, part.second);
-            }
+            discovered_system.addAsync(participants);
             return std::move(discovered_system);
         }
         throw std::runtime_error("can not create a service bus connection to system '"
@@ -1189,7 +1274,6 @@ namespace fep3
     {
         return discoverAllSystemsByURL(arya::IServiceBusConnection::ISystemAccess::_use_default_url ,timeout);
     }
-
 
     std::vector<System> discoverAllSystemsByURL(std::string discover_url,
         std::chrono::milliseconds timeout /*= FEP_SYSTEM_DISCOVER_TIMEOUT*/)
@@ -1207,40 +1291,77 @@ namespace fep3
                 throw std::runtime_error("can not create a system access on service bus connection to discover all systems at url '"
                     + discover_url);
             }
-            std::map<std::string, std::unique_ptr<System>> all_systems_map;
 
             auto all_participants = sys_access->discover(timeout);
+            if (all_participants.empty())
+            {
+                return {};
+            }
+
+            std::map<std::string, std::multimap<std::string, std::string>> systems_participants;
             for (auto& part : all_participants)
             {
-                auto splitted_id =  a_util::strings::split(part.first, "@", true);
-                if (splitted_id.size() > 0)
+                auto splitted_id = a_util::strings::split(part.first, "@", true);
+                const std::string& system_name = splitted_id[1];
+                const std::string& participant_name = splitted_id[0];
+                const std::string& participant_url = part.second;
+                if (splitted_id.size() > 1)
                 {
-                    auto existing_system = all_systems_map.find(splitted_id[1]);
-                    if (existing_system != all_systems_map.end())
-                    {
-                        existing_system->second->add(splitted_id[0], part.second);
-                    }
-                    else
-                    {
-                        all_systems_map[splitted_id[1]] = std::make_unique<System>(splitted_id[1]);
-                        all_systems_map[splitted_id[1]]->add(splitted_id[0], part.second);
-                    }
+                   systems_participants[system_name].emplace(participant_name, participant_url);
                 }
                 else
                 {
-                    //found invalid id / do not know if i inform about that
+
+                   const std::string error_mesage = a_util::strings::format(
+                       "Parsing error while discoverAllSystems by URL %s .Expected a string like participant_name@system_name but got %s ",
+                        discover_url.c_str(),
+                       part.first.c_str());
+                   throw std::runtime_error(error_mesage);
                 }
             }
+
+            // take the system names
+            auto all_system_names = boost::adaptors::keys(systems_participants);
+            // map that contains the discoverd system objects
+            std::map<std::string, std::unique_ptr<System>> all_systems_map;
+            // create system objects, only once, discarding the duplicates
+            boost::range::transform(all_system_names,
+                std::inserter(all_systems_map, all_systems_map.end()),
+                [](const std::string & sys_name)
+                {
+                    return std::make_pair(sys_name, std::make_unique<System>(sys_name));
+                });
+
+            //split the total number of threads to each system
+            const uint8_t pool_size = std::max(static_cast<uint8_t>(1),
+                static_cast<uint8_t>(pool_size_for_parallel_ops / static_cast<uint8_t>(all_systems_map.size())));
+
+            //add the participants to each system asynchronously
+            boost::asio::thread_pool pool(all_systems_map.size());
+            for (auto& system_and_participants : systems_participants)
+            {
+                boost::asio::post(pool,
+                    [&,pool_size]()
+                    {
+                        all_systems_map.at(system_and_participants.first)->addAsync(system_and_participants.second, pool_size);
+                    });
+            }
+            pool.join();
+
             std::vector<System> result_vector_system;
             for (auto& found_sys : all_systems_map)
             {
                 result_vector_system.emplace_back(std::move(*found_sys.second.release()));
             }
-
             return std::move(result_vector_system);
         }
         throw std::runtime_error("can not create a service bus connection to discover all systems at url ''"
             + discover_url + "'");
+    }
+
+    void preloadServiceBusPlugin()
+    {
+        ServiceBusFactory::get();
     }
 
 namespace experimental

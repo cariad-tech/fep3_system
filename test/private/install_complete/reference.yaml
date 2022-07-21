@@ -16,6 +16,8 @@ common:
         - fep3_system-config-version.cmake
         - fep3_system-macros.cmake
         - README.md
+        - doc/license/LICENSE.md
+        - doc/license/license_notes_from_aosd.txt
         - doc/license/used_licenses/.+
         - include/fep_system/fep_system_version.h
         - include/fep_system/fep_system.h
@@ -58,7 +60,7 @@ linux_shared_debug:
             os: Linux
             build_type: Debug
     files:
-        - lib/libfep3_systemd3.0.so
+        - lib/libfep3_systemd3.1.so
         - lib/cmake/fep3_system_targets-debug.cmake
         - lib/cmake/fep3_http_service_bus_targets-debug.cmake
 
@@ -68,17 +70,17 @@ linux_shared_release:
             os: Linux
             build_type: Release
     files:
-        - lib/libfep3_system3.0.so
+        - lib/libfep3_system3.1.so
         - lib/cmake/fep3_system_targets-release.cmake
         - lib/cmake/fep3_http_service_bus_targets-release.cmake
 
-linux_shared_relWithdebInfo:
+linux_shared_rel_with_deb_info:
     conditions:
         my_conds:
             os: Linux
             build_type: RelWithDebInfo
     files:
-        - lib/libfep3_system3.0.so
+        - lib/libfep3_system3.1.so
         - lib/cmake/fep3_system_targets-relwithdebinfo.cmake
         - lib/cmake/fep3_http_service_bus_targets-relwithdebinfo.cmake
 
@@ -95,12 +97,25 @@ windows_shared_debug:
             os: Windows
             build_type: Debug
     files:
-        - lib/fep3_systemd3.0.dll
-        - lib/fep3_systemd3.0.lib
-        - lib/fep3_systemd3.0.pdb
+        - lib/fep3_systemd3.1.dll
+        - lib/fep3_systemd3.1.lib
+        - lib/fep3_systemd3.1.pdb
         - lib/http/fep3_http_service_bus.pdb
         - lib/cmake/fep3_system_targets-debug.cmake
         - lib/cmake/fep3_http_service_bus_targets-debug.cmake
+
+windows_shared_rel_with_deb_info:
+    conditions:
+        my_conds:
+            os: Windows
+            build_type: RelWithDebInfo
+
+    files:
+        - lib/cmake/fep3_http_service_bus_targets-relwithdebinfo.cmake
+        - lib/cmake/fep3_system_targets-relwithdebinfo.cmake
+        - lib/fep3_system3.1.dll
+        - lib/fep3_system3.1.lib
+        - lib/fep3_system3.1.pdb
 
 windows_shared_release:
     conditions:
@@ -109,8 +124,8 @@ windows_shared_release:
             build_type: Release
 
     files:
-        - lib/fep3_system3.0.dll
-        - lib/fep3_system3.0.lib
+        - lib/fep3_system3.1.dll
+        - lib/fep3_system3.1.lib
         - lib/cmake/fep3_system_targets-release.cmake
         - lib/cmake/fep3_http_service_bus_targets-release.cmake
 
@@ -144,4 +159,4 @@ documentation:
         - doc/html/.+\.inv
         - doc/html/.+\.ico
         - doc/html/\.buildinfo
-        - LICENSE
+        - doc/license/LICENSE.md
