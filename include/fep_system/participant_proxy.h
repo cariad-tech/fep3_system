@@ -93,7 +93,7 @@ public:
      */
     ParticipantProxy(const ParticipantProxy& other);
     /**
-     * @brief copies another participant prox instance to the current
+     * @brief copies another participant proxy instance to the current
      *
      * @param[in] other the other to copy
      * @return ParticipantProxy&
@@ -141,7 +141,7 @@ public:
      * set priority that the participant should use when the system is triggered
      * into state running.
      * /note the starting priority has nothing in common with the init priority
-     * and will be evaluated separately
+     * and will be evaluated separately.
      * The lower the priority the later the participant will be triggered.
      * Negative values are allowed
      *
@@ -165,7 +165,7 @@ public:
     std::string getName() const;
 
     /**
-     * @brief Get the Url of the participant
+     * @brief Get the url of the participant
      *
      * @return std::string  the url of the participant
      */
@@ -197,7 +197,7 @@ public:
      * @param[in] component_iid  the rpc server interface identifier of the rpc component to request
      * @param[out] proxy_ptr will contain the valid interface if available
      * @return @c true if the server is reachable, @c false otherwise (not reachable, the
-     server object does not exist or the given interface is not supported)
+     server object does not exist, or the given interface is not supported)
      * \throw runtime_error See exception for more information
      */
     bool getRPCComponentProxy(const std::string& component_name,
@@ -211,7 +211,7 @@ public:
      * @param[in] component_iid  the rpc component service interface identifier looking for
      * @param[out] proxy_ptr will contain the valid interface if available
      * @return @c true the server is reachable, @c false otherwise (the server is not reachable,
-     * the server object does not exist or the given interface is not supported)
+     * the server object does not exist, or the given interface is not supported)
      * \throw runtime_error See exception for more information
      */
     bool getRPCComponentProxyByIID(const std::string& component_iid,
@@ -265,12 +265,12 @@ public:
         }
     }
     /**
-     * If logging is enabled this unregisters from logger.
+     * If logging is enabled, this unregisters from logger.
      */
     void deregisterLogging();
 
     /**
-     * Check if the participant has a SystemLogger interface registered.
+     * Check if the participant has a system logger interface registered.
      *
      * @retval True if a logging interface is registered, false otherwise.
      */

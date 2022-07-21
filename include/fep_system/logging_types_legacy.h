@@ -33,16 +33,16 @@ enum Category : uint32_t
 {
     ///any category for logging events that does not fit into any of the other
     CATEGORY_NONE = 0,
-    ///Marks log event event that occurred on system level.
+    ///Marks log event that occurred on system level.
     ///There might be log events on participant category before
     CATEGORY_SYSTEM = 1,
-    ///Marks log event event that occurred on participant level.
+    ///Marks log event that occurred on participant level.
     /// there might be log events on component or element category before
     CATEGORY_PARTICIPANT = 2,
-    ///Marks log event event that occurred on component level
+    ///Marks log event that occurred on component level
     ///these components are StateMachine, DataRegistry, SimulationBus
     CATEGORY_COMPONENT = 3,
-    ///Marks log event event that occurred on element functionality level
+    ///Marks log event that occurred on element functionality level
     ///the element category is for user level implemented within the element functionality
     ///one log may be: "ESP did only found 3 wheels, where is the fourth?" (Decide by your own which fep::logging::Severity this will be.)
     CATEGORY_ELEMENT = 4

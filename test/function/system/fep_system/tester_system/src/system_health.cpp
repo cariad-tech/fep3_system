@@ -39,7 +39,7 @@ struct SystemLibrarySingleParticipant : public testing::Test
     void SetUp() override
     {
         // health state tests require the tested participant to provide a health service component which is not enabled by default currently
-        const std::string components_file_path(std::string(TEST_BUILD_DIR) + "/../files/fep3_participant.fep_components");
+        const std::string components_file_path(std::string(TEST_BUILD_DIR));
         a_util::process::setEnvVar("FEP3_PARTICIPANT_COMPONENTS_FILE_PATH", components_file_path);
 
         _participants = createTestParticipants({ _participant_name }, _system.getSystemName());
@@ -153,7 +153,7 @@ struct SystemLibraryThreeParticipants : public testing::Test
     void SetUp() override
     {
         // health state tests require the tested participant to provide a health service component which is not enabled by default currently
-        const std::string components_file_path(std::string(TEST_BUILD_DIR) + "/../files/fep3_participant.fep_components");
+        const std::string components_file_path(std::string(TEST_BUILD_DIR));
         a_util::process::setEnvVar("FEP3_PARTICIPANT_COMPONENTS_FILE_PATH", components_file_path);
 
         _participants = createTestParticipants({

@@ -38,9 +38,9 @@ namespace arya
  */
 enum ParticipantState
 {
-    ///This state is used if a participant has no StateMachine or is not reachable (maybe shutdowned)
+    ///This state is used if a participant has no StateMachine or is not reachable (maybe shut down)
     undefined,
-    ///This state is used if a state machine was detected before, but currently the state can not be obtained (no answer)
+    ///This state is used if a state machine was detected before, but currently the state cannot be obtained (no answer)
     unreachable,
     ///valid unloaded state
     unloaded,
@@ -50,7 +50,7 @@ enum ParticipantState
     initialized,
     ///valid paused state
     paused,
-    ///valid runing state
+    ///valid running state
     running
 };
 
@@ -69,7 +69,7 @@ protected:
 
 public:
     /**
-     * @brief State for particiants
+     * @brief State for participants
      * @see ParticipantState
      */
     using State = ParticipantState;
@@ -86,13 +86,13 @@ public:
      */
     virtual void load() = 0;
     /**
-     * @brief sends a unload event to the participants state machine
+     * @brief sends an unload event to the participants state machine
      * @throw logical_error if the event is invalid
      *
      */
     virtual void unload() = 0;
     /**
-     * @brief sends a initalize event to the participants state machine
+     * @brief sends an initialize event to the participants state machine
      * @throw logical_error if the event is invalid
      *
      */

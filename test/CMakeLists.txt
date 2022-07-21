@@ -19,9 +19,11 @@ if(NOT FEP3_TESTS_INTEGRATED)
     cmake_minimum_required(VERSION 3.17.0 FATAL_ERROR)
 
     # Disable extensions here and require the chosen CMAKE_CXX_STANDARD (coming from e.g. Conan)
-    set(CMAKE_CXX_STANDARD 14)
     set(CMAKE_CXX_EXTENSIONS OFF)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    if (NOT DEFINED CMAKE_CXX_STANDARD)
+        set(CMAKE_CXX_STANDARD 17)
+    endif()
 
     cmake_policy(SET CMP0002 NEW)
     cmake_policy(SET CMP0003 NEW)

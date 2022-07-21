@@ -71,7 +71,7 @@ public:
      *
      *
      * @return returns a connection to the IProperties node.
-     * @retval empty_shared_ptr property does not exists
+     * @retval empty_shared_ptr property does not exist
      */
     virtual std::shared_ptr<const IProperties> getProperties(const std::string& property_path) const = 0;
 };

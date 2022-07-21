@@ -12,6 +12,11 @@
 # You may add additional accurate notices of copyright ownership.
 # 
 #
+fep3_participant_create_copy_target(tester_determinism)
+fep3_system_create_copy_target(tester_determinism)
+set_target_properties(fep_system_file_copy_tester_determinism PROPERTIES FOLDER test/determinism/copy_helpers)
+set_target_properties(fep_participant_file_copy_tester_determinism PROPERTIES FOLDER test/determinism/copy_helpers)
+
 find_package(fep3_participant_cpp REQUIRED)
 find_package(Boost 1.73.0 REQUIRED COMPONENTS filesystem)
 
@@ -79,7 +84,8 @@ else()
     endforeach()
     set_target_properties(tester_determinism PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/$(Configuration)")
 endif()
-fep3_system_deploy(tester_determinism)
+set_target_properties(${_current_test_name} PROPERTIES INSTALL_RPATH "$ORIGIN")
+add_dependencies(tester_determinism fep_system_file_copy_tester_determinism)
 
 ##################################################################
 # common files
@@ -110,7 +116,8 @@ target_link_libraries(transmitter_one PRIVATE
     dev_essential::pkg_rpc)
 
 set_target_PROPERTIES(transmitter_one PROPERTIES FOLDER test/determinism/participants)
-fep3_participant_deploy(transmitter_one)
+set_target_properties(transmitter_one PROPERTIES INSTALL_RPATH "$ORIGIN")
+add_dependencies(transmitter_one fep_participant_file_copy_tester_determinism)
 
 ##################################################################
 # transmitter_two
@@ -128,7 +135,8 @@ target_link_libraries(transmitter_two PRIVATE
     dev_essential::pkg_rpc)
 
 set_target_PROPERTIES(transmitter_two PROPERTIES FOLDER test/determinism/participants)
-fep3_participant_deploy(transmitter_two)
+set_target_properties(transmitter_two PROPERTIES INSTALL_RPATH "$ORIGIN")
+add_dependencies(transmitter_two fep_participant_file_copy_tester_determinism)
 
 ##################################################################
 # receiver
@@ -144,4 +152,5 @@ target_link_libraries(receiver PRIVATE
     dev_essential::pkg_rpc)
 
 set_target_PROPERTIES(receiver PROPERTIES FOLDER test/determinism/participants)
-fep3_participant_deploy(receiver)
+set_target_properties(receiver PROPERTIES INSTALL_RPATH "$ORIGIN")
+add_dependencies(receiver fep_participant_file_copy_tester_determinism)

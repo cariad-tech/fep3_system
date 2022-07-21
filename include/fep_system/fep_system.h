@@ -42,7 +42,7 @@ You may add additional accurate notices of copyright ownership.
 namespace fep3
 {
     /**
-     * @brief The aggregated system state as particiapnt state.
+     * @brief The aggregated system state as participant state.
      *
      */
     using SystemAggregatedState = fep3::rpc::ParticipantState;
@@ -146,7 +146,7 @@ namespace fep3
          * @brief Construct a new System object
          *
          * @remark at the moment of FEP 2 there is no system affiliation implemented within the participants.
-         *         for fep3 the systemname will be considered. If empty the system name is really not set!
+         *         for fep3 the system name will be considered. If empty the system name is really not set!
          */
         System();
         /**
@@ -168,8 +168,8 @@ namespace fep3
          * @brief Copy Construct a new System object
          *
          * @param[in] other the other system object to copy from
-         * @remark we can not copy the registered event monitor!
-         *         This is also a very expensive operation, use move instead if possible!
+         * @remark we cannot copy the registered event monitor!
+         *         This is also a very expensive operation; use move instead if possible!
          */
         System(const System& other);
         /**
@@ -182,8 +182,8 @@ namespace fep3
          * @brief Copy assignment
          *
          * @param[in] other the other system object to copy from
-         * @remark we can not copy the registered event monitor !
-         *         This is also a very expensive operation, use move instead if possible!
+         * @remark we cannot copy the registered event monitor!
+         *         This is also a very expensive operation; use move instead if possible!
          * @return copied system
          */
         System& operator=(const System& other);
@@ -203,12 +203,12 @@ namespace fep3
         /**
          * @brief Sets the system state
          * depending on the current state this function will increase or decrease
-         * the systemstate to the given AggregatedState.
+         * the system state to the given AggregatedState.
          * Only homogenous system states are valid as starting point.
          *
          * @param[in] state the aggregated state to set
-         * @param[in] timeout the timeout used for each statechange
-         * @throw runtime_error if a homogenouse state can not be reachedor the starting state is not homogenouse
+         * @param[in] timeout the timeout used for each state change
+         * @throw runtime_error if a homogenous state cannot be reached or the starting state is not homogenous
          *
          */
         void setSystemState(System::AggregatedState state,
@@ -222,7 +222,7 @@ namespace fep3
          */
         void load(std::chrono::milliseconds timeout = FEP_SYSTEM_TRANSITION_TIMEOUT) const;
         /**
-         * @brief sends a unload event to every participant
+         * @brief sends an unload event to every participant
          *
          * @param[in] timeout timeout for waiting on the response of every participant
          * @throw throws a logical_error if a participant declined the state change (i.e. it is in the wrong state)
@@ -296,6 +296,7 @@ namespace fep3
         */
         void add(const std::string& participant_name,
                  const std::string& participant_url = std::string());
+
         /**
         * @c adds the list of participants to the system
         * @param[in]   participants         list of participant names
@@ -309,10 +310,28 @@ namespace fep3
         *
         */
         void add(const std::multimap<std::string, std::string>& participants);
+
+        /**
+        * @c adds the list of participants to the system in an asynchronous execution.
+        *    Function returnes once the participants are added to the system.
+        * @param[in]   participants         map of participant names and url pairs
+        *
+        */
+        void addAsync(const std::multimap<std::string, std::string>& participants);
+
+        /**
+        * @c adds the list of participants to the system in an asynchronous execution
+        *         Function returnes once the participants are added to the system.
+        * @param[in]   participants         map of participant names and url pairs
+        * @param[in]   pool_size            size of the thread pool to be used for the parallel execution.
+        *
+        */
+        void addAsync(const std::multimap<std::string, std::string>& participants, uint8_t pool_size);
+
         /**
         * @c removes the participant from the system
         * @param[in]   participant_name         participant name
-        * @remark existing references to participant proxy instances are disconneted from this system object
+        * @remark existing references to participant proxy instances are disconnected from this system object
         *
         */
         void remove(const std::string& participant_name);
@@ -320,13 +339,13 @@ namespace fep3
         /**
         * @c removes the list of participants from the system
         * @param[in]   participants         list of participant names
-        * @remark existing references to participant proxy instances are disconneted from this system object
+        * @remark existing references to participant proxy instances are disconnected from this system object
         */
         void remove(const std::vector<std::string>& participants);
 
         /**
         * @c clearSystem removes all current participants from the system
-        * @remark existing references to participant proxy instances are disconneted from this system object
+        * @remark existing references to participant proxy instances are disconnected from this system object
         */
         void clear();
 
@@ -341,10 +360,10 @@ namespace fep3
         * @param[in]  master_time_factor     Multiplication factor of the simulation speed. Won't be set if an empty string gets passed.
         * @param[in]  slave_sync_cycle_time  The time in ns between synchronizations. Won't be set if an empty string gets passed.
         *
-        * @throws std::runtime_error if one of the timing properties can not be set
+        * @throws std::runtime_error if one of the timing properties cannot be set
         *
         * @note master_clock_name, master_time_stepsize, master_time_factor and slave_sync_cycle_time will only
-        *       be set if the master_element_id is a non empty string.
+        *       be set if the master_element_id is a non-empty string.
         *
         */
         void configureTiming(const std::string& master_clock_name, const std::string& slave_clock_name,
@@ -356,7 +375,7 @@ namespace fep3
          * Configures the timing by resetting timing master.
          * Each particiapnt will work in system time by itself
          *
-         * @throws std::runtime_error if one of the timing properties can not be set
+         * @throws std::runtime_error if one of the timing properties cannot be set
          *
          */
         void configureTiming3NoMaster() const;
@@ -366,10 +385,10 @@ namespace fep3
          * @param[in]  master_element_id      The element id (participant name) of the timing master.
          * @param[in]  slave_sync_cycle_time  The time in ns between synchronizations. Won't be set if an empty string gets passed.
          *
-         * @throws std::runtime_error if one of the timing properties can not be set
+         * @throws std::runtime_error if one of the timing properties cannot be set
          *
          * @note slave_sync_cycle_time will only
-         *       be set if the master_element_id is a non empty string.
+         *       be set if the master_element_id is a non-empty string.
          *
          */
         void configureTiming3ClockSyncOnlyInterpolation(const std::string& master_element_id, const std::string& slave_sync_cycle_time) const;
@@ -379,10 +398,10 @@ namespace fep3
          * @param[in]  master_element_id      The element id (participant name) of the timing master.
          * @param[in]  slave_sync_cycle_time  The time in ns between synchronizations. Won't be set if an empty string gets passed.
          *
-         * @throws std::runtime_error if one of the timing properties can not be set
+         * @throws std::runtime_error if one of the timing properties cannot be set
          *
          * @note slave_sync_cycle_time will only
-         *       be set if the master_element_id is a non empty string.
+         *       be set if the master_element_id is a non-empty string.
          *
          */
         void configureTiming3ClockSyncOnlyDiscrete(const std::string& master_element_id, const std::string& slave_sync_cycle_time) const;
@@ -394,10 +413,10 @@ namespace fep3
          * @param[in]  master_time_stepsize   The time in ns between discrete time steps. Won't be set if an empty string gets passed.
          * @param[in]  master_time_factor     Multiplication factor of the simulation speed. Won't be set if an empty string gets passed.
          *
-         * @throws std::runtime_error if one of the timing properties can not be set
+         * @throws std::runtime_error if one of the timing properties cannot be set
          *
          * @note master_time_stepsize and master_time_factor will only
-         *       be set if the master_element_id is a non empty string.
+         *       be set if the master_element_id is a non-empty string.
          *
          */
         void configureTiming3DiscreteSteps(const std::string& master_element_id, const std::string& master_time_stepsize, const std::string& master_time_factor) const;
@@ -410,10 +429,10 @@ namespace fep3
          * @param[in]  master_element_id      The element id (participant name) of the timing master.
          * @param[in]  master_time_stepsize   The time in ns between discrete time steps. Won't be set if an empty string gets passed.
          *
-         * @throws std::runtime_error if one of the timing properties can not be set
+         * @throws std::runtime_error if one of the timing properties cannot be set
          *
          * @note master_time_stepsize will only
-         *       be set if the master_element_id is a non empty string.
+         *       be set if the master_element_id is a non-empty string.
          *
          */
         void configureTiming3AFAP(const std::string& master_element_id, const std::string& master_time_stepsize) const;
@@ -468,7 +487,7 @@ namespace fep3
         *
         * @param[in] event_listener The listener
         * @retval true/false        Everything went fine/Something went wrong.
-        * On Failure a Incident will be send with a detailed description
+        * On Failure an Incident will be send with a detailed description
         */
         void registerMonitoring(IEventMonitor& event_listener);
 
@@ -551,7 +570,7 @@ namespace experimental
         /**
          * @brief CTOR to set a homogenous health state.
          *
-         * @param[in] system_health_state the aggregated healths state is always the highest health state of the participants
+         * @param[in] system_health_state the aggregated health state is always the highest health state of the participants
          */
         SystemHealthState(const SystemAggregatedHealthState& system_health_state) : _homogeneous(true), _system_health_state(system_health_state) {}
         /**
@@ -623,7 +642,7 @@ namespace experimental
          * @param participant_name the name of the participant to set the health state for
          * @param message message indicating the reason for the health state change
          * @return Result indicating whether the rpc call succeeded or failed
-         * @retval ERR_NOERROR in case of successfull rpc call
+         * @retval ERR_NOERROR in case of successful rpc call
          */
         a_util::result::Result resetHealth(const std::string& participant_name, const std::string& message);
         /// @cond no_doc
@@ -675,6 +694,11 @@ namespace experimental
      *                      (for filtering of standalone participants)
      */
     std::vector<System> FEP3_SYSTEM_EXPORT discoverAllSystems(std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
+
+    /**
+    * Loads the service bus plugin.
+    */
+    void FEP3_SYSTEM_EXPORT preloadServiceBusPlugin();
 
     /**
      * discoverAllSystemsByURL discovers all participants at all system
