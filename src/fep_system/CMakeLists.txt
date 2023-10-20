@@ -1,18 +1,24 @@
 # Copyright @ 2021 VW Group. All rights reserved.
-# 
+#
 #     This Source Code Form is subject to the terms of the Mozilla
 #     Public License, v. 2.0. If a copy of the MPL was not distributed
 #     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-# 
+#
 # If it is not possible or desirable to put the notice in a particular file, then
 # You may include the notice in a location (such as a LICENSE file in a
 # relevant directory) where a recipient would be likely to look for such a notice.
-# 
+#
 # You may add additional accurate notices of copyright ownership.
 
-find_package(dev_essential REQUIRED COMPONENTS date_time system process strings xml pkg_rpc)
-# For boost asio
-find_package(Boost 1.73.0 REQUIRED)
+if(NOT TARGET dev_essential)
+    find_package(dev_essential REQUIRED COMPONENTS date_time system process result strings xml pkg_rpc)
+else()
+    include(${dev_essential_SOURCE_DIR}/scripts/cmake/stub_generation.cmake)
+endif()
+
+if(NOT TARGET fep3_component_registry)
+    find_package(fep3_component_registry REQUIRED)
+endif()
 
 # fep system library
 set(SYSTEM_SOURCES_PUBLIC
@@ -21,24 +27,21 @@ set(SYSTEM_SOURCES_PUBLIC
     ${PROJECT_SOURCE_DIR}/include/fep_system/fep_system.h
     ${PROJECT_SOURCE_DIR}/include/fep_system/system_logger_intf.h
     ${PROJECT_SOURCE_DIR}/include/fep_system/participant_proxy.h
-    ${PROJECT_SOURCE_DIR}/include/fep_system/rpc_component_proxy.h)
+    ${PROJECT_SOURCE_DIR}/include/fep_system/rpc_component_proxy.h
+    ${PROJECT_SOURCE_DIR}/include/fep_system/healthiness_types.h)
 
 # install destination should not be forgotten: include/fep_system/rpc_services/rpc
 set(SYSTEM_EXT_PUBLIC_SOURCES_RPC
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/base/fep_rpc_iid.h
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/base/fep_rpc_client_intf.h
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/base/fep_rpc_client.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/base/fep_rpc_iid.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/base/fep_rpc_client_intf.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/base/fep_rpc_client.h
     )
 
 # install destination should not be forgotten: include/fep_system/base/logging
 set(SYSTEM_EXT_PUBLIC_SOURCES_LOGGING_BASE
-    ${PARTICIPANT_LIB_DIR}/include/fep3/base/logging/logging_types.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/base/logging/logging_types.h
     )
 
-# install destination should not be forgotten: include/fep_system/base/health
-set(SYSTEM_EXT_PUBLIC_SOURCES_HEALTH_BASE
-    ${PARTICIPANT_LIB_DIR}/include/fep3/base/health/health_types.h
-    )
 
 # subtle difference: on unix the command silently fails if the output directory does not exist...
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs)
@@ -52,13 +55,17 @@ file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/include/fep_system/rpc_services)
 
 # install destination should not be forgotten: include/fep_system/rpc_services/participant_info
 set(SYSTEM_EXT_PUBLIC_SOURCES_PARTICIPANT_INFO
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/participant_info/participant_info_rpc_intf_def.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/participant_info/participant_info_rpc_intf_def.h
     )
 
-jsonrpc_generate_client_stub(${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/participant_info/participant_info.json
-                             fep3::rpc_proxy_stub::RPCParticipantInfoProxy
-                             ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/participant_info_proxy_stub.h)
-
+add_custom_target(fep_system_rpc_stub_generator)
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/participant_info/participant_info.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::RPCParticipantInfoProxy
+    CLIENT_FILE_NAME participant_info_proxy_stub.h
+)
 
 ###################################################
 # FEP 3 State Machine
@@ -66,12 +73,16 @@ jsonrpc_generate_client_stub(${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/pa
 
 # install destination should not be forgotten: include/fep_system/rpc_services/participant_statemachine
 set(SYSTEM_EXT_PUBLIC_SOURCES_STATE_MACHINE_FEP
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/participant_statemachine/participant_statemachine_rpc_intf_def.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/participant_statemachine/participant_statemachine_rpc_intf_def.h
     )
 
-jsonrpc_generate_client_stub(${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/participant_statemachine/participant_statemachine.json
-                             fep3::rpc_proxy_stub::RPCStateMachineProxy
-                             ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/participant_statemachine_proxy_stub.h)
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/participant_statemachine/participant_statemachine.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::RPCStateMachineProxy
+    CLIENT_FILE_NAME participant_statemachine_proxy_stub.h
+)
 
 ###################################################
 # FEP 3 Clock
@@ -79,13 +90,34 @@ jsonrpc_generate_client_stub(${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/pa
 
 # install destination should not be forgotten: include/fep_system/rpc_services/clock
 set(SYSTEM_EXT_PUBLIC_SOURCES_CLOCK_FEP
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/clock/clock_service_rpc_intf_def.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/clock/clock_service_rpc_intf_def.h
     )
 
-jsonrpc_generate_client_stub(${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/clock/clock.json
-                             fep3::rpc_proxy_stub::RPCClockServiceProxy
-                             ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/clock_proxy_stub.h)
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/clock/clock.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::RPCClockServiceProxy
+    CLIENT_FILE_NAME clock_proxy_stub.h
+)
 
+###################################################
+# FEP 3 Service Bus: Http Server
+###################################################
+
+# install destination should not be forgotten: include/fep_system/rpc_services/service_bus
+
+set(SYSTEM_EXT_PUBLIC_SOURCES_HTTP_SERVER_FEP
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/service_bus/http_server_rpc_intf_def.h
+    )
+
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/service_bus/http_server.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::RPCHttpServerProxy
+    CLIENT_FILE_NAME http_server_proxy_stub.h
+)
 
 ###################################################
 # Data Registry
@@ -93,24 +125,27 @@ jsonrpc_generate_client_stub(${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/cl
 
 # install destination should not be forgotten: include/fep_system/rpc_services/data_registry
 set(SYSTEM_EXT_PUBLIC_SOURCES_DATA_REGISTRY
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/data_registry/data_registry_rpc_intf_def.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/data_registry/data_registry_rpc_intf_def.h
     )
 
 # install destination should not be forgotten: ${PROJECT_BINARY_DIR}/include/fep_system/rpc_services/data_registry
 set(SYSTEM_EXT_PUBLIC_SOURCES_STREAM_TYPE_BASE
-    ${PARTICIPANT_LIB_DIR}/include/fep3/base/stream_type/stream_type_intf.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/base/stream_type/stream_type_intf.h
     )
 
 # properties are needed for logging, dataregistry (stream type) and configuration service
 # install destination should not be forgotten: ${PROJECT_BINARY_DIR}/include/fep_system/rpc_services/properties
 set(SYSTEM_EXT_PUBLIC_SOURCES_PROPERTY_BASE
-    ${PARTICIPANT_LIB_DIR}/include/fep3/base/properties/properties_intf.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/base/properties/properties_intf.h
     )
 
-jsonrpc_generate_client_stub(
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/data_registry/data_registry.json
-    fep3::rpc_proxy_stub::RPCDataRegistryProxy
-    ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/data_registry_proxy_stub.h)
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/data_registry/data_registry.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::RPCDataRegistryProxy
+    CLIENT_FILE_NAME data_registry_proxy_stub.h
+)
 
 # properties for the moment
 file(COPY ${SYSTEM_EXT_PUBLIC_SOURCES_PROPERTY_BASE}
@@ -123,24 +158,32 @@ file(COPY ${SYSTEM_EXT_PUBLIC_SOURCES_PROPERTY_BASE}
 
 # install destination should not be forgotten: include/fep_system/rpc_services/logging
 set(SYSTEM_EXT_PUBLIC_SOURCES_LOGGING
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/logging/logging_service_rpc_intf_def.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/logging/logging_service_rpc_intf_def.h
     )
 
-jsonrpc_generate_client_stub(
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/logging/logging_service.json
-    fep3::rpc_proxy_stub::RPCLoggingServiceProxy
-    ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/logging_service_proxy_stub.h)
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/logging/logging_service.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::RPCLoggingServiceProxy
+    CLIENT_FILE_NAME logging_service_proxy_stub.h
+)
 
-jsonrpc_generate_client_stub(
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/logging/logging_rpc_sink_service.json
-    fep3::rpc_proxy_stub::RPCLoggingSinkService
-    ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/logging_sink_service_stub.h)
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/logging/logging_rpc_sink_service.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::RPCLoggingSinkService
+    CLIENT_FILE_NAME logging_sink_service_stub.h
+)
 
-jsonrpc_generate_server_stub(
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/logging/logging_rpc_sink_client.json
-    fep3::rpc_proxy_stub::RPCLoggingSink
-    ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/logging_sink_stub.h)
-
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/logging/logging_rpc_sink_client.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    SERVER_CLASS_NAME fep3::rpc_proxy_stub::RPCLoggingSink
+    SERVER_FILE_NAME logging_sink_stub.h
+)
 
 ###################################################
 # Configuration
@@ -148,13 +191,16 @@ jsonrpc_generate_server_stub(
 
 # install destination should not be forgotten: include/fep_system/rpc_services/configuration
 set(SYSTEM_EXT_PUBLIC_SOURCES_CONFIGURATION
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/configuration/configuration_rpc_intf_def.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/configuration/configuration_rpc_intf_def.h
     )
 
-jsonrpc_generate_client_stub(
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/configuration/configuration.json
-    fep3::rpc_proxy_stub::RPCConfigurationServiceProxy
-    ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/configuration_service_proxy_stub.h)
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/configuration/configuration.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::RPCConfigurationServiceProxy
+    CLIENT_FILE_NAME configuration_service_proxy_stub.h
+)
 
 ###################################################
 # Health
@@ -162,13 +208,16 @@ jsonrpc_generate_client_stub(
 
 # install destination should not be forgotten: include/fep_system/rpc_services/health
 set(SYSTEM_EXT_PUBLIC_SOURCES_HEALTH
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/health/health_service_rpc_intf_def.h
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/health/health_service_rpc_intf_def.h
     )
 
-jsonrpc_generate_client_stub(
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/health/health.json
-    fep3::rpc_proxy_stub::RPCHealthServiceProxy
-    ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/health_service_proxy_stub.h)
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/health/health.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::RPCHealthServiceProxy
+    CLIENT_FILE_NAME health_service_proxy_stub.h
+)
 
 ###################################################
 # collect all private proxy implementations
@@ -193,9 +242,14 @@ set(SYSTEM_PROXY_SOURCES_PRIVATE
 
     rpc_services/configuration_proxy.hpp
     ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/configuration_service_proxy_stub.h
+
     rpc_services/rpc_passthrough.hpp
+
     rpc_services/health_proxy.hpp
     ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/health_service_proxy_stub.h
+
+    rpc_services/http_server_proxy.hpp
+    ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/http_server_proxy_stub.h
 )
 
 ### plugin things
@@ -223,8 +277,8 @@ set(SYSTEM_SOURCES_PRIVATE
     participant_proxy.cpp
     system_logger.h
     ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/logging_sink_stub.h
-    service_bus_factory.h
-    service_bus_factory.cpp
+    service_bus_wrapper.h
+    service_bus_wrapper.cpp
     private_participant_proxy.hpp)
 
 add_library(${FEP3_SYSTEM_LIBRARY} SHARED
@@ -233,7 +287,7 @@ add_library(${FEP3_SYSTEM_LIBRARY} SHARED
     ${SYSTEM_PROXY_SOURCES_PRIVATE}
     ${SYSTEM_EXT_PUBLIC_SOURCES_RPC}
     ${SYSTEM_EXT_PUBLIC_SOURCES_LOGGING_BASE}
-    ${SYSTEM_EXT_PUBLIC_SOURCES_HEALTH_BASE}
+    #${SYSTEM_EXT_PUBLIC_SOURCES_HEALTH_BASE}
 
     ${PLUGIN_SOURCES}
 
@@ -244,14 +298,17 @@ add_library(${FEP3_SYSTEM_LIBRARY} SHARED
     ${SYSTEM_EXT_PUBLIC_SOURCES_CLOCK_FEP}
 
     ${SYSTEM_EXT_PUBLIC_SOURCES_LOGGING}
+    ${SYSTEM_EXT_PUBLIC_SOURCES_HTTP_SERVER_FEP}
 
     ${SYSTEM_EXT_PUBLIC_SOURCES_CONFIGURATION}
-    ${SYSTEM_EXT_PUBLIC_SOURCES_HEALTH}
+   # ${SYSTEM_EXT_PUBLIC_SOURCES_HEALTH}
     ${SYSTEM_EXT_PUBLIC_SOURCES_PROPERTY_BASE}
 
     ${SYSTEM_EXT_PUBLIC_SOURCES_DATA_REGISTRY}
     ${SYSTEM_EXT_PUBLIC_SOURCES_STREAM_TYPE_BASE}
 )
+
+add_dependencies(${FEP3_SYSTEM_LIBRARY} fep_system_rpc_stub_generator)
 
 set_target_properties(${FEP3_SYSTEM_LIBRARY} PROPERTIES
     OUTPUT_NAME ${FEP3_SYSTEM_LIBRARY}
@@ -264,23 +321,30 @@ set_target_properties(${FEP3_SYSTEM_LIBRARY} PROPERTIES CXX_VISIBILITY_PRESET hi
 
 set(BUILD_INTERFACE_INCLUDES
     ${CMAKE_CURRENT_LIST_DIR}
-    ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_BINARY_DIR}/include
-    ${PROJECT_SOURCE_DIR}/include/fep_system
-    ${PROJECT_SOURCE_DIR}/src
-    ${PARTICIPANT_LIB_DIR}/include
-    ${PARTICIPANT_LIB_DIR}/include/fep3
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/participant_info
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/participant_statemachine
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/clock
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/data_registry
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/logging
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/configuration
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/health
-    ${PARTICIPANT_LIB_DIR}/include/fep3/rpc_services/base
     ${PROJECT_BINARY_DIR}/src/fep_system
     ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/include/fep_system
+    ${PROJECT_SOURCE_DIR}/src
+    ${fep3_participant_INCLUDE_DIR}
+    ${fep3_participant_INCLUDE_DIR}/fep3
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/base
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/clock
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/configuration
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/data_registry
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/health
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/logging
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/participant_info
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/participant_statemachine
+    ${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/service_bus
 )
+
+#in case we build fep3_participant, we have to include version file from build folder
+if(TARGET fep3_participant)
+    get_target_property(PARTICIPANT_BINARY_DIR fep3_participant BINARY_DIR)
+    list(APPEND BUILD_INTERFACE_INCLUDES ${PARTICIPANT_BINARY_DIR}/../../include/)
+endif()
 
 set(INSTALL_INTERFACE_INCLUDES
     include)
@@ -288,7 +352,7 @@ set(INSTALL_INTERFACE_INCLUDES
 if(WIN32)
     set(BUILD_LIBRARY_FLAGS "")
 else()
-    set(BUILD_LIBRARY_FLAGS "-Wl,--start-group;-Wl,--no-as-needed")
+    set(BUILD_LIBRARY_FLAGS "-Wl,--start-group -Wl,--no-as-needed -Wl,--end-group")
 endif()
 
 target_link_libraries(${FEP3_SYSTEM_LIBRARY}
@@ -299,7 +363,10 @@ target_link_libraries(${FEP3_SYSTEM_LIBRARY}
         dev_essential::strings
         dev_essential::xml
         dev_essential::pkg_rpc
-        Boost::disable_autolinking
+        system_discovery_helper
+        health_service_helper
+        fep3_component_registry
+        ${CMAKE_DL_LIBS}
     PUBLIC
         ${BUILD_LIBRARY_FLAGS}
 
@@ -308,8 +375,6 @@ target_link_libraries(${FEP3_SYSTEM_LIBRARY}
 target_include_directories(${FEP3_SYSTEM_LIBRARY} PUBLIC
     "$<BUILD_INTERFACE:${BUILD_INTERFACE_INCLUDES}>"
     "$<INSTALL_INTERFACE:${INSTALL_INTERFACE_INCLUDES}>"
-    PRIVATE
-    ${Boost_INCLUDE_DIRS}
 )
 target_compile_features(${FEP3_SYSTEM_LIBRARY} PUBLIC cxx_std_${CMAKE_CXX_STANDARD})
 
@@ -329,6 +394,7 @@ install(FILES ${SYSTEM_EXT_PUBLIC_SOURCES_DATA_REGISTRY} DESTINATION include/fep
 install(FILES ${SYSTEM_EXT_PUBLIC_SOURCES_LOGGING} DESTINATION include/fep_system/rpc_services/logging)
 install(FILES ${SYSTEM_EXT_PUBLIC_SOURCES_CONFIGURATION} DESTINATION include/fep_system/rpc_services/configuration)
 install(FILES ${SYSTEM_EXT_PUBLIC_SOURCES_HEALTH} DESTINATION include/fep_system/rpc_services/health)
+install(FILES ${SYSTEM_EXT_PUBLIC_SOURCES_HTTP_SERVER_FEP} DESTINATION include/fep_system/rpc_services/service_bus)
 
 target_compile_definitions(${FEP3_SYSTEM_LIBRARY} PRIVATE FEP3_SYSTEM_LIB_DO_EXPORT)
 set_target_properties(${FEP3_SYSTEM_LIBRARY} PROPERTIES CXX_VISIBILITY_PRESET hidden)
@@ -348,15 +414,15 @@ install(FILES ${CMAKE_BINARY_DIR}/fep3_system-config.cmake DESTINATION .)
 
 
 if(WIN32)
-    set(TARGET_SERVICE_BUS ./http/fep3_http_service_bus.dll)
+    set(TARGET_SERVICE_BUS ./rti/fep3_dds_service_bus_plugin.dll)
 else()
-    set(TARGET_SERVICE_BUS ./http/libfep3_http_service_bus.so)
+    set(TARGET_SERVICE_BUS ./rti/libfep3_dds_service_bus_plugin.so)
 endif()
 
-configure_file(fep3_system.plugins.in ${CMAKE_BINARY_DIR}/fep3_system.plugins @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/fep3_system.plugins DESTINATION lib)
-add_custom_command(TARGET ${FEP3_SYSTEM_LIBRARY} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/fep3_system.plugins" "$<TARGET_FILE_DIR:${FEP3_SYSTEM_LIBRARY}>"
+configure_file(fep3_system.fep_components.in ${CMAKE_BINARY_DIR}/fep3_system.fep_components @ONLY)
+install(FILES ${CMAKE_BINARY_DIR}/fep3_system.fep_components DESTINATION lib)
+add_custom_command(TARGET ${FEP3_SYSTEM_LIBRARY} PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_BINARY_DIR}/fep3_system.fep_components" "$<TARGET_FILE_DIR:${FEP3_SYSTEM_LIBRARY}>"
     )
 
 
@@ -375,6 +441,11 @@ install(TARGETS ${FEP3_SYSTEM_LIBRARY}
     ARCHIVE DESTINATION lib
 )
 
+if(UNIX)
+    # we shall not export symbols from linked static libraries
+    target_link_options(${FEP3_SYSTEM_LIBRARY} PRIVATE "-Wl,--exclude-libs,$<TARGET_FILE_NAME:fep3_component_registry>")
+endif(UNIX)
+
 install(EXPORT fep3_system_export DESTINATION lib/cmake
     FILE fep3_system_targets.cmake
 )
@@ -384,7 +455,7 @@ set(fep3_system_no_copy_pluginfile True)
 fep3_system_deploy(${FEP3_SYSTEM_LIBRARY})
 
 #but we need to install the targets.cmake files from participant to use it at cmake file of the fep3_system
-install(DIRECTORY ${PARTICIPANT_LIB_DIR}/lib/cmake
+install(DIRECTORY ${fep3_participant_ROOT}/lib/cmake
     DESTINATION lib
     FILES_MATCHING PATTERN "*service_bus*.cmake")
 
@@ -392,9 +463,14 @@ if(WIN32)
     install(FILES $<TARGET_PDB_FILE:fep3_system> DESTINATION lib OPTIONAL)
 endif(WIN32)
 
-#install service bus plugin to build folder, to be used within integrated tests
+#copy service bus plugin to build folder, to be used within integrated tests
 #(it will be referenced relative to the system library in the build folder)
 if(UNIX)
-    install(FILES $<TARGET_FILE:fep3_http_service_bus> DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/http)
+    fep3_system_plugins_deploy_helper(${FEP3_SYSTEM_LIBRARY} $<TARGET_FILE_DIR:${FEP3_SYSTEM_LIBRARY}>)
 endif()
 
+add_subdirectory(base)
+
+if(fep3_system_cmake_python_version)
+    add_subdirectory(python)
+endif()

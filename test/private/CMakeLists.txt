@@ -1,0 +1,2 @@
+add_subdirectory(tester_discover_system_participants)
+add_subdirectory(tester_health_service_helpers)

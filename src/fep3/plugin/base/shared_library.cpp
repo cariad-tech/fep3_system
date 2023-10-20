@@ -20,6 +20,7 @@ You may add additional accurate notices of copyright ownership.
 
 #include <a_util/filesystem.h>
 #include <a_util/strings.h>
+#include <fep3/fep3_errors.h>
 
 #include "shared_library.h"
 
@@ -60,10 +61,24 @@ SharedLibrary::SharedLibrary(const std::string& file_path, bool prevent_unloadin
 
     const auto& full_file_path_string = full_file_path.toString();
 #ifdef WIN32
+    // remember the cwd
+    const auto& original_working_dir = a_util::filesystem::getWorkingDirectory();
+    // on windows we need to switch to the directory where the library is located
+    // to ensure loading of dependee dlls that reside in the same directory
+    a_util::filesystem::setWorkingDirectory(full_file_path.getParent());
+
     _library_handle = ::LoadLibrary(full_file_path_string.c_str());
     if (!_library_handle)
     {
         throw std::runtime_error("unable to load shared library '" + file_path + "'");
+    }
+
+    // switch back to the original cwd
+    if (a_util::filesystem::Error::OK !=
+        a_util::filesystem::setWorkingDirectory(original_working_dir))
+    {
+        throw std::runtime_error("unable to switch back to original working directory to " +
+            original_working_dir + "; current working directory might be wrong " + full_file_path.getParent());
     }
 #else
     _library_handle = ::dlopen(full_file_path_string.c_str(), RTLD_LAZY);

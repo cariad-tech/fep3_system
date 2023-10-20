@@ -22,9 +22,9 @@ You may add additional accurate notices of copyright ownership.
 #include <gmock/gmock.h>
 #include <fep_system/fep_system.h>
 #include "participant_configuration_helper.hpp"
-#include "fep_test_common.h"
-#include <fep_system/mock/event_monitor.h>
-#include "../../../../../function/utils/common/gtest_asserts.h"
+#include <fep_test_common.h>
+#include <fep_system/mock_event_monitor.h>
+#include <gtest_asserts.h>
 #include <fep_system/rpc_services/rpc_passthrough/rpc_passthrough_intf.h>
 
 /**

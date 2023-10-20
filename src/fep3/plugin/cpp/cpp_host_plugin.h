@@ -45,12 +45,6 @@ namespace arya
             virtual ~HostPlugin();
 
             /**
-             * Gets the version namespace of the plugin as string
-             * @return The version namespace of the plugin as string
-             */
-            virtual std::string getVersionNamespace() const;
-
-            /**
              * Creates an object of type @p t from within the plugin
              * by calling the factory function symbol \p factory_function_symbol_name in the plugin.
              *
@@ -73,16 +67,13 @@ namespace arya
                         << factory_function_symbol_name << "' function."
                         << "Note: This participant uses version " << FEP3_PARTICIPANT_LIBRARY_VERSION_MAJOR
                         << "." << FEP3_PARTICIPANT_LIBRARY_VERSION_MINOR
-                        << " of the fep_participant library, the plugin's version is " << getVersionNamespace() << ".";
+                        << " of the fep_participant library, the plugin's version is " << getPluginVersion() << ".";
                     throw std::runtime_error(error.str());
                 }
                 // note: the factory function transfers ownership of the created object to the caller
                 const auto& pointer_to_created_object = factory_function(std::forward<argument_types>(arguments)...);
                 return std::unique_ptr<t>(pointer_to_created_object);
             }
-
-        private:
-            std::string _version_namespace{"unknown"};
     };
 } // namespace arya
 using arya::HostPlugin;

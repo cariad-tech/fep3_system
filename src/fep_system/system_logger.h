@@ -51,7 +51,8 @@ namespace fep3
             const std::string& timestamp) override
         {
             _system_logger.log(
-                std::chrono::milliseconds(a_util::strings::toInt64(timestamp)),
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::nanoseconds(a_util::strings::toInt64(timestamp))),
                 static_cast<LoggerSeverity>(severity),
                 participant,
                 logger_name,
@@ -65,7 +66,14 @@ namespace fep3
     {
     public:
         SystemLogger()
+            : _servicebus_connection(getServiceBusWrapper())
         {
+        }
+
+        ~SystemLogger()
+        {
+            _system_access->getServer()->unregisterService(
+                rpc::IRPCLoggingSinkClientDef::getRPCDefaultName());
         }
 
         void registerMonitor(IEventMonitor* monitor)
@@ -110,30 +118,18 @@ namespace fep3
 
         void initRPCService(const std::string& system_name)
         {
-            //we create an service bus connection without appearing as server that is discoverable
-            //so use a separate one!
-            _servicebus_connection = ServiceBusFactory::get().createOrGetServiceBusConnection(system_name, "");
-            if (!_servicebus_connection)
-            {
-                throw std::runtime_error("it is not possible to create or get a service bus connection for logger on system " + system_name);
-            }
-            _system_access = _servicebus_connection->getSystemAccess(system_name);
+            //we create an server that is not discoverable
+            _system_access = _servicebus_connection.createOrGetServiceBusConnection(system_name,"")->getSystemAccessCatelyn(system_name);
+
             if (!_system_access)
             {
-                auto res = _servicebus_connection->createSystemAccess(system_name, "", false);
-                if (isFailed(res))
-                {
-                    throw std::runtime_error("it is not possible to create or get a system access for logger on system " + system_name);
-                }
-                else
-                {
-                    _system_access = _servicebus_connection->getSystemAccess(system_name);
-                }
+                throw std::runtime_error("it is not possible to create a system access for logger on system " + system_name);
+
             }
 
-            auto result_creation = _system_access->createServer("system_" + system_name + "_" + a_util::strings::toString(getId()),
-                arya::IServiceBus::ISystemAccess::_use_default_url);
-            if (isFailed(result_creation))
+            const auto result_creation = _system_access->createServer("system_" + system_name + "_" + a_util::strings::toString(getId()),
+                arya::IServiceBus::ISystemAccess::_use_default_url, false);
+            if (!result_creation)
             {
                 throw std::runtime_error("it is not possible to create or get a server for logger on system " + system_name);
             }
@@ -169,8 +165,8 @@ namespace fep3
         LoggerSeverity _level = LoggerSeverity::info;
         IEventMonitor* _monitor = nullptr;
         mutable std::recursive_mutex _synch_event_monitor;
-        std::shared_ptr<arya::IServiceBus::ISystemAccess> _system_access;
-        std::shared_ptr<arya::IServiceBusConnection> _servicebus_connection;
+        std::shared_ptr<fep3::IServiceBus::ISystemAccess> _system_access;
+        ServiceBusWrapper _servicebus_connection;
         std::shared_ptr<LogSinkImpl> _log_sink_impl;
 
     };

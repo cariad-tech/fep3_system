@@ -33,22 +33,23 @@ You may add additional accurate notices of copyright ownership.
 #include <gmock/gmock.h>
 #include <fep_system/fep_system.h>
 #include "participant_configuration_helper.hpp"
-#include "fep_test_common.h"
+#include <fep_test_common.h>
 #include <fep3/base/properties/propertynode.h>
 #include <fep3/base/properties/propertynode_helper.h>
-#include <fep_system/mock/event_monitor.h>
-#include "../../../../../function/utils/common/gtest_asserts.h"
+#include <fep_system/mock_event_monitor.h>
+#include <gtest_asserts.h>
 
 
 using EventMonitorMock = testing::NiceMock<fep3::mock::EventMonitor>;
+using namespace std::literals::chrono_literals;
 
 TEST(ParticipantConfiguration, TestProxyConfigGetter)
 {
     using namespace fep3;
-    System system_under_test(makePlatformDepName("Blackbox"));
+    const std::string system_name = makePlatformDepName("Blackbox");
 
-    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_under_test.getSystemName());
-    system_under_test.add("Participant1_configuration_test");
+    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_name);
+    fep3::System system_under_test = fep3::discoverSystem(system_name, { "Participant1_configuration_test" }, 4000ms);
 
     auto p1 = system_under_test.getParticipant("Participant1_configuration_test");
 
@@ -84,10 +85,10 @@ TEST(ParticipantConfiguration, TestProxyConfigGetter)
 TEST(ParticipantConfiguration, TestProxyConfigSetter)
 {
     using namespace fep3;
-    System system_under_test(makePlatformDepName("Blackbox"));
+    const std::string system_name = makePlatformDepName("Blackbox");
 
-    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_under_test.getSystemName());
-    system_under_test.add("Participant1_configuration_test");
+    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_name);
+    fep3::System system_under_test = fep3::discoverSystem(system_name, { "Participant1_configuration_test" }, 4000ms);
 
     auto p1 = system_under_test.getParticipant("Participant1_configuration_test");
 
@@ -123,10 +124,10 @@ TEST(ParticipantConfiguration, TestProxyConfigSetter)
 TEST(ParticipantConfiguration, TestProxyConfigArraySetter)
 {
     using namespace fep3;
-    System system_under_test(makePlatformDepName("Blackbox"));
+    const std::string system_name = makePlatformDepName("Blackbox");
 
-    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_under_test.getSystemName());
-    system_under_test.add("Participant1_configuration_test");
+    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_name);
+    fep3::System system_under_test = fep3::discoverSystem(system_name, { "Participant1_configuration_test" }, 4000ms);
 
     auto p1 = system_under_test.getParticipant("Participant1_configuration_test");
 
@@ -172,10 +173,10 @@ TEST(ParticipantConfiguration, TestProxyConfigArraySetter)
 TEST(cTesterParticipantConfiguration, TestInvalidPropertySyntax)
 {
     using namespace fep3;
-    System system_under_test(makePlatformDepName("Blackbox"));
+    const std::string system_name = makePlatformDepName("Blackbox");
 
-    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_under_test.getSystemName());
-    system_under_test.add("Participant1_configuration_test");
+    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_name);
+    fep3::System system_under_test = fep3::discoverSystem(system_name, { "Participant1_configuration_test" }, 4000ms);
 
     auto p1 = system_under_test.getParticipant("Participant1_configuration_test");
 
@@ -214,10 +215,10 @@ TEST(cTesterParticipantConfiguration, TestInvalidPropertySyntax)
 TEST(cTesterParticipantConfiguration, TestRootPropertySetter)
 {
     using namespace fep3;
-    System system_under_test(makePlatformDepName("Blackbox"));
+    const std::string system_name = makePlatformDepName("Blackbox");
 
-    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_under_test.getSystemName());
-    system_under_test.add("Participant1_configuration_test");
+    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_name);
+    fep3::System system_under_test = fep3::discoverSystem(system_name, { "Participant1_configuration_test" }, 4000ms);
 
     auto p1 = system_under_test.getParticipant("Participant1_configuration_test");
 
@@ -265,10 +266,10 @@ TEST(cTesterParticipantConfiguration, TestRootPropertySetter)
 TEST(cTesterParticipantConfiguration, TestProxyConfigPropNotExistsNoCreate)
 {
     using namespace fep3;
-    System system_under_test(makePlatformDepName("Blackbox"));
+    const std::string system_name = makePlatformDepName("Blackbox");
 
-    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_under_test.getSystemName());
-    system_under_test.add("Participant1_configuration_test");
+    auto parts = createTestParticipants({ "Participant1_configuration_test" }, system_name);
+    fep3::System system_under_test = fep3::discoverSystem(system_name, { "Participant1_configuration_test" }, 4000ms);
 
     auto p1 = system_under_test.getParticipant("Participant1_configuration_test");
 

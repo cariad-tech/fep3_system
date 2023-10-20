@@ -20,44 +20,42 @@ You may add additional accurate notices of copyright ownership.
 
 #include "transmitter_base.h"
 
+#include <fep3/cpp/element_base.h>
 #include <fep3/cpp/participant.h>
 
-#include <3rdparty/clara/Clara-1.1.2/single_include/clara.hpp>
+#include <iostream>
+
+using namespace fep3;
 
 class TransmitJobTwo : public TransmitJobBase
 {
 public:
-    TransmitJobTwo(fep3::arya::JobConfiguration job_config) : TransmitJobBase(job_config)
+    TransmitJobTwo(const fep3::IComponents& components)
+        : TransmitJobBase(components, "transmit_job_two_logger")
     {
-        _data_writer = addDataOut("data_two", fep3::base::StreamTypePlain<int32_t>());
-        _values = { 5, 2, 10 };
+        _data_writer = addDataOut("data_two", fep3::base::StreamTypePlain<uint32_t>());
     }
 };
 
 int main(int argc, char* argv[])
 {
-    // We cannot use the createParticipant parser because we need the command line arguments already for the parameters of createParticipant.
-    // So we have to parse the arguments ourselves beforehand.
-    uint32_t cycle_time{FEP3_CLOCK_SIM_TIME_STEP_SIZE_DEFAULT_VALUE};
-    uint32_t offset{};
-    clara::Parser parser;
-    parser |= clara::Opt(cycle_time, "milliseconds")
-        ["-c"]["--cycletime"]
-        ("Set the cycle time of the data job");
-    parser |= clara::Opt(offset, "milliseconds")
-        ["-o"]["--offset"]
-        ("Set the cycle time offset of the data job");
-
-    parser.parse(clara::Args(argc, argv));
-
-    auto elem_factory = std::make_shared<fep3::test::DataJobElementFactory<fep3::test::DataJobElement<TransmitJobTwo>>>(
-        fep3::JobConfiguration(std::chrono::milliseconds(cycle_time), std::chrono::milliseconds(offset)));
-    auto participant = fep3::core::createParticipant("test_transmitter_two",
-        FEP3_PARTICIPANT_LIBRARY_VERSION_STR,
-        "test_system",
-        elem_factory);
-
-    participant.exec();
-
-    return{};
+    try
+    {
+        auto participant = core::createParticipant<test::DataJobElementFactoryWithComponents<TransmitJobTwo>>
+            (argc
+            , argv
+            , FEP3_PARTICIPANT_LIBRARY_VERSION_STR
+            );
+        return participant.exec();
+    }
+    catch (const std::exception& ex)
+    {
+        std::cerr << ex.what();
+        return -1;
+    }
+    catch (...)
+    {
+        std::cerr << "exception caught";
+        return -1;
+    }
 }

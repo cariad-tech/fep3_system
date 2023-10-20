@@ -21,12 +21,14 @@ You may add additional accurate notices of copyright ownership.
 
 #include "fep_system/fep_system_types.h"
 #include "fep_system/rpc_component_proxy.h"
+#include "fep_system/healthiness_types.h"
 #include "rpc_services/participant_info/participant_info_rpc_intf.h"
 #include "rpc_services/participant_statemachine/participant_statemachine_rpc_intf.h"
 #include "rpc_services/clock/clock_service_rpc_intf.h"
 #include "rpc_services/data_registry/data_registry_rpc_intf.h"
 #include "rpc_services/configuration/configuration_rpc_intf.h"
-#include "rpc_services/health/health_service_rpc_intf.h"
+#include "rpc_services/service_bus/http_server_rpc_intf.h"
+//#include "rpc_services/health/health_service_rpc_intf.h"
 #include "rpc_services/logging/logging_rpc_intf.h"
 #include "system_logger_intf.h"
 
@@ -275,6 +277,34 @@ public:
      * @retval True if a logging interface is registered, false otherwise.
      */
     bool loggingRegistered() const;
+
+     /**
+     * @brief returns the participant health received after the last alive message
+     *
+     *
+     * @return ParticipantHealthUpdate the last updated health of the participant
+     * @throw runtime_error throws if health listener is deactivated
+     * (using  @ref fep3::ParticipantProxy::setHealthListenerRunningStatus)
+     */
+    ParticipantHealthUpdate getParticipantHealth() const;
+
+    /**
+     * Activates or deactivates the health listener. Per default the health listener is activated.
+     * Deactivation will reduce the load of the system, since the polling the participant's health
+     * with RPC calls is deactivated.
+     * In case the listener is deactivated, polling the participant's health with
+     * @ref fep3::ParticipantProxy::getParticipantHealth, will result in exception.
+     *
+     * @param[in] running Set to true to activate the health listener and false to deactivate.
+     */
+    void setHealthListenerRunningStatus(bool running);
+
+    /**
+    * Returns the running state of the participant's health listener.
+    *
+    * @return  bool the participant's health listener running state.
+    */
+    bool getHealthListenerRunningStatus() const;
 
     /// @cond no_documentation
 private:

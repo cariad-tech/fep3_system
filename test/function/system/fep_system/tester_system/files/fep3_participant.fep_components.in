@@ -29,9 +29,10 @@
     </component>
     <component>
         <source type="cpp-plugin">
-             ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/fep_components_plugin
+            <!-- ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/fep_components_plugin -->
+            ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/rti/fep3_dds_service_bus_plugin
         </source>
-        <iid>service_bus.arya.fep3.iid</iid>
+        <iid>service_bus.catelyn.fep3.iid</iid>
     </component>
     <component>
         <source type="cpp-plugin">
@@ -67,12 +68,12 @@
        <source type="cpp-plugin">
              ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/fep_components_plugin
         </source>
-        <iid>scheduler_service.arya.fep3.iid</iid>
+        <iid>scheduler_service.catelyn.fep3.iid</iid>
     </component>
     <component>
         <source type="cpp-plugin">
             ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/fep_components_plugin
         </source>
-        <iid>health_service.experimental.fep3.iid</iid>
+        <iid>health_service.catelyn.fep3.iid</iid>
     </component>
 </components>

@@ -35,7 +35,7 @@ namespace fep3
 {
 namespace rpc
 {
-namespace arya
+namespace catelyn
 {
 class DataRegistryProxy : public RPCServiceClientProxy<
     rpc_proxy_stub::RPCDataRegistryProxy,
@@ -80,35 +80,31 @@ public:
 
     std::shared_ptr<fep3::arya::IStreamType> getStreamType(const std::string& signal_name) const override
     {
-        try {
-            auto stream_type_return = GetStub().getStreamType(signal_name);
-            auto meta_typename = stream_type_return["meta_type"].asString();
-            auto properties = stream_type_return["properties"];
-            auto names = a_util::strings::split(properties["names"].asString(), ",");
-            auto values = a_util::strings::split(properties["values"].asString(), ",", true);
-            auto types = a_util::strings::split(properties["types"].asString(), ",");
+         try {
+             const auto json_value = GetStub().getStreamType(signal_name);
+             auto stream_type = std::make_shared<base::StreamType>(
+                 base::StreamMetaType(json_value["meta_type"].asString()));
 
-            base::StreamMetaType meta_type(meta_typename);
-            auto stream_type_created = std::make_shared<base::StreamType>(meta_type);
-            auto current_name = names.begin();
-            auto current_value = values.begin();
-            auto current_type = types.begin();
-            while (current_name != names.end() && current_value != values.end() && current_type != types.end())
-            {
-                stream_type_created->setProperty(*current_name, *current_value, *current_type);
-                current_name++;
-                current_value++;
-                current_type++;
-            }
-            return stream_type_created;
-        }
-        catch (...)
-        {
-            return nullptr;
-        }
+             const auto properties = json_value["properties"];
+             auto current_property = properties.begin();
+
+             while (current_property != properties.end())
+             {
+                 stream_type->setProperty((*current_property)["name"].asString(),
+                     (*current_property)["value"].asString(),
+                     (*current_property)["type"].asString());
+                 current_property++;
+             }
+
+             return stream_type;
+         }
+         catch (...)
+         {
+             return nullptr;
+         }
     }
 
 };
-}
-}
-}
+} // catelyn
+} // rpc
+} // fep3
