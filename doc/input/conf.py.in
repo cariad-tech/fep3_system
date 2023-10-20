@@ -52,6 +52,12 @@ breathe_default_project = "fep_system_api"
 templates_path = ['_templates']
 exclude_patterns = []
 
+# Function qualifiers cause Sphinhx/Breathe to warn
+# when parsing function declarations.  A list of
+# strings that the parser additionally should accept as attributes.
+cpp_id_attributes = [
+    'FEP3_SYSTEM_EXPORT'
+]
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -62,7 +68,9 @@ html_favicon = '../images/fep_logo_white.ico' # An image used as icon in the bro
 html_copy_source = True # DO copy the source .rst files to the output dir in order to make search work properly
 html_title = project # Title of the HTML in the browser
 html_static_path = ['_static'] # Additional css files
-html_context = {'css_files': ['_static/theme_overrides.css']} # Additional css files to override wide tables
+html_css_files = [
+    'theme_overrides.css',
+] # Additional css files to override wide tables
 html_theme_options = {
     'style_external_links': True,
     'style_nav_header_background': '#004666',

@@ -30,12 +30,28 @@ You may add additional accurate notices of copyright ownership.
  */
 
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
+
+#include <a_util/system.h>
 #include <fep_system/fep_system.h>
 #include <string.h>
-#include "fep_test_common.h"
-#include <fep3/components/experimental/health_service_intf.h>
+#include <fep_test_common.h>
 
 using namespace fep3;
+
+#define ASSERT_THROW_MESSAGE_HAS_SUBSTR(statement, expected_exception, substr) \
+EXPECT_THROW( \
+    { \
+        try \
+        { \
+            (statement);\
+        } \
+        catch (const expected_exception& e) \
+        { \
+            ASSERT_THAT(e.what(), ::testing::HasSubstr(substr)); \
+            throw; \
+        } \
+    }, expected_exception); \
 
 class TestEventMonitor : public fep3::IEventMonitor
 {
@@ -90,26 +106,21 @@ private:
 struct SystemLibrarySingleParticipant : public testing::Test
 {
     SystemLibrarySingleParticipant()
-        : _system(makePlatformDepName(_system_name))
+        : _system_name(makePlatformDepName("test_system"))
     {
     }
 
     void SetUp() override
     {
-        ASSERT_NO_THROW(
-            _participants = createTestParticipants({ _participant_name }, _system.getSystemName());
-        );
-
-        ASSERT_NO_THROW(
-            _system.add(_participant_name);
-        );
+        using namespace std::chrono_literals;
+        _participants = createTestParticipants({ _participant_name }, _system_name);
+        _system = fep3::discoverSystem(_system_name, { _participant_name }, 10s);
     }
 
-    const char* _system_name{ "test_system" };
-    System _system;
-
+    fep3::System _system;
+    const std::string _system_name;
     TestParticipants _participants{};
-    const std::string _participant_name{"test_participant"};
+    const std::string _participant_name{ "test_participant" };
 };
 
 TEST_F(SystemLibrarySingleParticipant, TestStateProxy)
@@ -270,4 +281,66 @@ TEST(SystemLibrary, DtorParticipantProxy)
         system.add(participant_name);
         p1 = system.getParticipant(participant_name);
     }
+}
+
+/**
+ * @brief Test whether setSystemState to unreachable does not throw an exception
+ *
+ */
+TEST(SystemLibrary, SetSystemStateToUnreachable)
+{
+    System system(makePlatformDepName("test_system"));
+    const std::vector<std::string> participant_name = { "test_participant_1" , "test_participant_2" };
+    auto participants = createTestParticipants(participant_name, system.getSystemName());
+    system.add(participant_name);
+
+    ASSERT_NO_THROW(system.setSystemState(fep3::SystemAggregatedState::unreachable));
+    ASSERT_EQ(system.getSystemState()._state, SystemAggregatedState::unreachable);
+}
+
+/**
+ * @brief Test whether setSystemState to undefined throw an exception
+ *
+ */
+TEST(SystemLibrary, SetSystemStateToUndefined)
+{
+    System system(makePlatformDepName("test_system"));
+    const std::vector<std::string> participant_name = { "test_participant_1" , "test_participant_2" };
+    auto participants = createTestParticipants(participant_name, system.getSystemName());
+    system.add(participant_name);
+
+    ASSERT_THROW_MESSAGE_HAS_SUBSTR(system.setSystemState(fep3::SystemAggregatedState::undefined),
+        std::runtime_error, "Invalid setSystemState call at system " + system.getSystemName());
+}
+
+/**
+ * @brief Test whether setParticipantState to unreachable does not throw an exception
+ *
+ */
+TEST(SystemLibrary, SetParticipantStateToUnreachable)
+{
+    System system(makePlatformDepName("test_system"));
+    const std::vector<std::string> participant_name = { "test_participant_1" , "test_participant_2" };
+    auto participants = createTestParticipants(participant_name, system.getSystemName());
+    system.add(participant_name);
+
+    ASSERT_NO_THROW(system.setParticipantState(participant_name[0], fep3::SystemAggregatedState::unreachable));
+    ASSERT_THROW_MESSAGE_HAS_SUBSTR(system.getParticipantState(participant_name[0]), std::runtime_error,
+        "No Participant with the name " + participant_name[0] + " found");
+
+}
+
+/**
+ * @brief Test whether setParticipantState to undefined throw an exception
+ *
+ */
+TEST(SystemLibrary, SetParticipantStateToUndefined)
+{
+    System system(makePlatformDepName("test_system"));
+    const std::vector<std::string> participant_name = { "test_participant_1" , "test_participant_2" };
+    auto participants = createTestParticipants(participant_name, system.getSystemName());
+    system.add(participant_name);
+
+    ASSERT_THROW_MESSAGE_HAS_SUBSTR(system.setParticipantState(participant_name[0], fep3::SystemAggregatedState::undefined),
+        std::runtime_error, "Invalid setSystemState call at system " + system.getSystemName());
 }

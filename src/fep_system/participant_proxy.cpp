@@ -135,4 +135,19 @@ bool ParticipantProxy::loggingRegistered() const
         return _impl->loggingRegistered();
 }
 
+ParticipantHealthUpdate ParticipantProxy::getParticipantHealth() const
+{
+    return _impl->getParticipantHealth();
+}
+
+void ParticipantProxy::setHealthListenerRunningStatus(bool running)
+{
+    return _impl->setHealthListenerRunningStatus(running);
+}
+
+bool ParticipantProxy::getHealthListenerRunningStatus() const
+{
+    return _impl->getHealthListenerRunningStatus();
+}
+
 }

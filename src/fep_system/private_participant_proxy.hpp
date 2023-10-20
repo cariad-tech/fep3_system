@@ -21,6 +21,7 @@ You may add additional accurate notices of copyright ownership.
 #pragma once
 #include <string>
 #include "system_logger_intf.h"
+#include "participant_health_listener.h"
 
 #include "rpc_services/participant_info_proxy.hpp"
 #include "rpc_services/participant_statemachine_proxy.hpp"
@@ -29,8 +30,9 @@ You may add additional accurate notices of copyright ownership.
 #include "rpc_services/logging_proxy.hpp"
 #include "rpc_services/configuration_proxy.hpp"
 #include "rpc_services/health_proxy.hpp"
+#include "rpc_services/http_server_proxy.hpp"
 #include "rpc_services/rpc_passthrough.hpp"
-#include "service_bus_factory.h"
+#include "service_bus_wrapper.h"
 #include <math.h>
 
 namespace fep3
@@ -45,6 +47,8 @@ public:
     typedef rpc::arya::IRPCParticipantStateMachine ConnectStateMachine;
     typedef rpc::arya::IRPCLoggingSinkService ConnectLoggingSinkService;
     typedef rpc::arya::IRPCConfiguration ConnectConfigurationService;
+    typedef rpc::catelyn::IRPCHealthService ConnectHealthService;
+    typedef rpc::catelyn::IRPCHttpServer ConnectHttpServer;
 
     template<typename T>
     class RPCComponentCache
@@ -155,15 +159,22 @@ public:
         _info(this),
         _state_machine(this),
         _logging(this),
-        _config(this)
+        _config(this),
+        _health(this),
+        _http_server(this),
+        _health_listener_running(true),
+        _service_bus_wrapper(getServiceBusWrapper())
     {
-        _service_bus_connection = ServiceBusFactory::get().createOrGetServiceBusConnection(system_name, system_discovery_url);
-        _system_access = _service_bus_connection->getSystemAccess(system_name);
+
+        _system_access = _service_bus_wrapper.createOrGetServiceBusConnection(system_name, system_discovery_url)->getSystemAccessCatelyn(system_name);
+
         if (!_system_access)
         {
             throw std::runtime_error(std::string("While contructing ") + participant_name + " at " + participant_url
                 + "no system connection to " + system_name + " at " + system_discovery_url +" possible");
         }
+        initHealthListener(system_name);
+
         _info.getValue();
         //only if info hasValue ... then it makes sense to connect to the others
         //otherwise ther is a huge timeout for every connecting
@@ -181,6 +192,8 @@ public:
 
     void deregisterLogging()
     {
+        // ensures that no logging is performed after the logger is deregistered
+        _participant_health_Listener->deactivateLogging();
         if (_registered_logging)
         {
             auto logging = _logging.getValue();
@@ -194,6 +207,10 @@ public:
 
     virtual ~Implementation()
     {
+        if (_health_listener_running)
+        {
+            _system_access->deregisterUpdateEventSink(_participant_health_Listener.get());
+        }
         deregisterLogging();
     }
 
@@ -205,7 +222,7 @@ public:
         other._start_priority = _start_priority;
         other._default_timeout = _default_timeout;
         other._additional_info = _additional_info;
-        other._service_bus_connection = _service_bus_connection;
+        other._service_bus_wrapper = _service_bus_wrapper;
         other._system_access = _system_access;
     }
 
@@ -245,36 +262,51 @@ public:
         IRPCComponentPtr& proxy_ptr) const
     {
         //this is very special and must be handled separately
-        if (component_iid == fep3::rpc::getRPCIID<ConnectParticipantInfo>())
+        auto requester = _system_access->getRequester(_participant_name);
+        if (requester == nullptr)
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::arya::ParticipantInfoProxy>(
+            return false;
+        }
+        else if (component_iid == fep3::rpc::getRPCIID<ConnectParticipantInfo>())
+        {
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::arya::ParticipantInfoProxy>(
                 component_name,
-                _system_access->getRequester(_participant_name));
+                requester);
             return proxy_ptr.reset(part_object);
         }
         else if (component_iid == fep3::rpc::getRPCIID<ConnectStateMachine>())
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::arya::ParticipantStateMachineProxy>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::arya::ParticipantStateMachineProxy>(
                 component_name,
-                _system_access->getRequester(_participant_name));
+                requester);
             return proxy_ptr.reset(part_object);
         }
         else if (component_iid == fep3::rpc::getRPCIID<ConnectLoggingSinkService>())
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::arya::LoggingSinkService>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::arya::LoggingSinkService>(
                 component_name,
-                _system_access->getRequester(_participant_name));
+                requester);
             return proxy_ptr.reset(part_object);
         }
         else if (component_iid == fep3::rpc::getRPCIID<fep3::rpc::experimental::RPCPassthrough>())
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::experimental::RPCPassthrough>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::experimental::RPCPassthrough>(
                 component_name,
-                _system_access->getRequester(_participant_name));
+                requester);
+            return proxy_ptr.reset(part_object);
+        }
+        else if (component_iid == fep3::rpc::getRPCIID<ConnectHealthService>())
+        {
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::catelyn::HealthServiceProxy>(
+                component_name,
+                requester);
+            return proxy_ptr.reset(part_object);
+        }
+        else if (component_iid == fep3::rpc::getRPCIID<ConnectHttpServer>())
+        {
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::catelyn::HttpServerProxy>(
+                component_name,
+                requester);
             return proxy_ptr.reset(part_object);
         }
 
@@ -304,70 +336,62 @@ public:
         {
             //also if this type is the same like ConnectParticipantInfo
             //we check that here for future use!!
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::arya::ParticipantInfoProxy>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::arya::ParticipantInfoProxy>(
                 component_name,
-                _system_access->getRequester(_participant_name));
+                requester);
             return proxy_ptr.reset(part_object);
         }
         else if (component_iid == fep3::rpc::getRPCIID<rpc::arya::IRPCParticipantStateMachine>())
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::arya::ParticipantStateMachineProxy>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::arya::ParticipantStateMachineProxy>(
                 component_name,
-                _system_access->getRequester(_participant_name));
+                requester);
             return proxy_ptr.reset(part_object);
         }
         else if (component_iid == fep3::rpc::getRPCIID<rpc::arya::IRPCClockService>())
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::arya::ClockServiceProxy>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::arya::ClockServiceProxy>(
                 component_name,
-                _system_access->getRequester(_participant_name));
+                requester);
             return proxy_ptr.reset(part_object);
         }
-        else if (component_iid == fep3::rpc::getRPCIID<rpc::arya::IRPCDataRegistry>())
+        else if (component_iid == fep3::rpc::getRPCIID<rpc::catelyn::IRPCDataRegistry>())
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::arya::DataRegistryProxy>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::catelyn::DataRegistryProxy>(
                 component_name,
-                _system_access->getRequester(_participant_name));
+                requester);
             return proxy_ptr.reset(part_object);
         }
         else if (component_iid == fep3::rpc::getRPCIID<rpc::arya::IRPCLoggingService>())
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::arya::LoggingServiceProxy>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::arya::LoggingServiceProxy>(
                 component_name,
-                _system_access->getRequester(_participant_name),
+                requester,
                 _participant_name,
                 *_logger);
             return proxy_ptr.reset(part_object);
         }
         else if (component_iid == fep3::rpc::getRPCIID<rpc::arya::IRPCLoggingSinkService>())
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::arya::LoggingSinkService>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::arya::LoggingSinkService>(
                 component_name,
-                _system_access->getRequester(_participant_name));
+                requester);
             return proxy_ptr.reset(part_object);
         }
         else if (component_iid == fep3::rpc::getRPCIID<rpc::arya::IRPCConfiguration>())
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<rpc::arya::ConfigurationProxy>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::arya::ConfigurationProxy>(
                 _participant_name,
                 component_name,
-                _system_access->getRequester(_participant_name),
+                requester,
                 *_logger);
             return proxy_ptr.reset(part_object);
         }
-        else if (component_iid == fep3::rpc::getRPCIID<experimental::IRPCHealthService>())
+        else if (component_iid == fep3::rpc::getRPCIID<rpc::catelyn::IRPCHealthService>())
         {
-            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object;
-            part_object = std::make_shared<experimental::arya::HealthServiceProxy>(
+            std::shared_ptr<rpc::arya::IRPCServiceClient> part_object = std::make_shared<rpc::catelyn::HealthServiceProxy>(
                 component_name,
-                _system_access->getRequester(_participant_name));
+                requester);
             return proxy_ptr.reset(part_object);
         }
 
@@ -403,6 +427,24 @@ public:
             if (val)
             {
                 return proxy_ptr.reset(_config.getValue().getServiceClient());
+            }
+            //go ahead and search another object
+        }
+        else if (decltype(_health)::value_type::getRPCIID() == component_iid)
+        {
+            auto val = _health.getValue();
+            if (val)
+            {
+                return proxy_ptr.reset(_health.getValue().getServiceClient());
+            }
+            //go ahead and search another object
+        }
+        else if (decltype(_http_server)::value_type::getRPCIID() == component_iid)
+        {
+            auto val = _http_server.getValue();
+            if (val)
+            {
+                return proxy_ptr.reset(_http_server.getValue().getServiceClient());
             }
             //go ahead and search another object
         }
@@ -470,7 +512,59 @@ public:
         return _registered_logging;
     }
 
+    ParticipantHealthUpdate  getParticipantHealth() const
+    {
+        if (_health_listener_running)
+        {
+            return _participant_health_Listener->getParticipantHealth();
+        }
+        else
+        {
+            throw std::runtime_error("You cannot get participant health with a deactivated health listener");
+        }
+    }
+
+    void setHealthListenerRunningStatus(bool running)
+    {
+        if (_health_listener_running == running)
+        {
+            return;
+        }
+        else
+        {
+            _health_listener_running = running;
+            if (running)
+            {
+                _system_access->registerUpdateEventSink(_participant_health_Listener.get());
+            }
+            else
+            {
+                _system_access->deregisterUpdateEventSink(_participant_health_Listener.get());
+            }
+        }
+    }
+
+    bool getHealthListenerRunningStatus() const
+    {
+        return _health_listener_running;
+    }
 private:
+    void initHealthListener(const std::string& system_name)
+    {
+        _participant_health_Listener = std::make_unique<ParticipantHealthListener>(&(_health.getValue().getInterface()),
+            _participant_name,
+            system_name,
+            [&](LoggerSeverity severity, const std::string& message)
+            {
+                if (_registered_logging)
+                {
+                    _logger->log(severity, _participant_name, "", message);
+                }
+            });
+
+        _system_access->registerUpdateEventSink(_participant_health_Listener.get());
+    }
+
     std::shared_ptr<ISystemLogger> _logger;
     std::string _participant_name;
     std::string _participant_url;
@@ -481,7 +575,8 @@ private:
     mutable RPCComponentCache<ConnectLoggingSinkService> _logging;
     bool _registered_logging{ false };
     mutable RPCComponentCache<ConnectConfigurationService> _config;
-
+    mutable RPCComponentCache<ConnectHealthService> _health;
+    mutable RPCComponentCache<ConnectHttpServer> _http_server;
 
 
     int32_t _init_priority;
@@ -489,7 +584,10 @@ private:
     std::chrono::milliseconds _default_timeout;
     std::map<std::string, std::string> _additional_info;
     //we need to make sure the service bus connection lives as locg the system access is used
-    std::shared_ptr<arya::IServiceBusConnection> _service_bus_connection;
-    std::shared_ptr<arya::IServiceBus::ISystemAccess> _system_access;
+    ServiceBusWrapper _service_bus_wrapper;
+    std::shared_ptr<fep3::IServiceBus::ISystemAccess> _system_access;
+    std::unique_ptr<ParticipantHealthListener> _participant_health_Listener;
+    bool _health_listener_running;
 };
+
 }

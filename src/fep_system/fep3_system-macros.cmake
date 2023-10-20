@@ -1,16 +1,16 @@
 #
 # Copyright @ 2021 VW Group. All rights reserved.
-# 
+#
 #     This Source Code Form is subject to the terms of the Mozilla
 #     Public License, v. 2.0. If a copy of the MPL was not distributed
 #     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-# 
+#
 # If it is not possible or desirable to put the notice in a particular file, then
 # You may include the notice in a location (such as a LICENSE file in a
 # relevant directory) where a recipient would be likely to look for such a notice.
-# 
+#
 # You may add additional accurate notices of copyright ownership.
-# 
+#
 #
 macro(fep3_system_set_folder NAME FOLDER)
     set_property(TARGET ${NAME} PROPERTY FOLDER ${FOLDER})
@@ -33,12 +33,23 @@ macro(fep3_system_install NAME DESTINATION)
     install(TARGETS ${NAME} DESTINATION ${DESTINATION})
 
     install(FILES $<TARGET_FILE:fep3_system> DESTINATION ${DESTINATION})
-    install(FILES $<TARGET_FILE_DIR:fep3_system>/fep3_system.plugins DESTINATION ${DESTINATION})
+    install(FILES $<TARGET_FILE_DIR:fep3_system>/fep3_system.fep_components DESTINATION ${DESTINATION})
     install(FILES $<TARGET_FILE:fep3_http_service_bus> DESTINATION ${DESTINATION}/http)
 
     if(MSVC)
-        install(FILES $<TARGET_FILE_DIR:fep3_system>/fep3_system$<$<CONFIG:Debug>:d>${fep3_system_pdb_version_str}.$<$<CONFIG:Debug>:pdb> DESTINATION ${DESTINATION} CONFIGURATIONS Debug)
-        install(FILES $<TARGET_FILE_DIR:fep3_http_service_bus>/fep3_http_service_bus.$<$<CONFIG:Debug>:pdb> DESTINATION ${DESTINATION}/http CONFIGURATIONS Debug)
+        install(FILES $<TARGET_FILE_DIR:fep3_system>/fep3_system$<$<CONFIG:Debug>:d>${fep3_system_pdb_version_str}.pdb DESTINATION ${DESTINATION} CONFIGURATIONS Debug RelWithDebInfo)
+        install(FILES $<TARGET_FILE_DIR:fep3_http_service_bus>/fep3_http_service_bus.pdb DESTINATION ${DESTINATION}/http CONFIGURATIONS Debug RelWithDebInfo)
+    endif()
+
+    if("${CMAKE_PROJECT_NAME}" STREQUAL "fep3-system-library")
+        # if this is called from fep system directly it can call the participant macro.
+        internal_fep3_dds_install(${DESTINATION})
+        install(FILES $<TARGET_FILE:fep3_dds_service_bus_plugin> DESTINATION ${DESTINATION}/rti)
+        if(MSVC)
+            install(FILES $<TARGET_FILE_DIR:fep3_dds_service_bus_plugin>/fep3_dds_service_bus_plugin.pdb DESTINATION ${DESTINATION}/rti CONFIGURATIONS Debug RelWithDebInfo)
+        endif(MSVC)
+    else()
+        install(DIRECTORY $<TARGET_FILE_DIR:fep3_system>/rti/ DESTINATION ${DESTINATION}/rti)
     endif()
 endmacro(fep3_system_install NAME DESTINATION)
 
@@ -49,7 +60,7 @@ endmacro(fep3_system_install NAME DESTINATION)
 #
 # This macro deploys the target the FEP System libraries (if neccessary)
 #   to the folder \<target_folder\>. Use it to copy library
-#   (and pdbs for MSVC) into the current target destination folder, which is 
+#   (and pdbs for MSVC) into the current target destination folder, which is
 #   either the build folder, or the package folder
 # DO NOT USE THIS IF THE DESTINATION FOLDER IS USED IN MORE THAN ONE TARGETS.
 # see https://cmake.org/cmake/help/v3.0/command/add_custom_command.html
@@ -63,21 +74,53 @@ macro(fep3_system_deploy_helper NAME TARGET_FOLDER)
     if (WIN32)
         add_custom_command(TARGET ${NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:fep3_system>" "${TARGET_FOLDER}"
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${TARGET_FOLDER}/http"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:fep3_http_service_bus>" "${TARGET_FOLDER}/http"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE_DIR:fep3_system>/fep3_system.plugins" "${TARGET_FOLDER}"
         )
+
         if(MSVC)
             add_custom_command(TARGET ${NAME} POST_BUILD
-                COMMAND "$<$<CONFIG:Debug>:${CMAKE_COMMAND}>$<$<NOT:$<CONFIG:Debug>>:echo>" $<$<CONFIG:Debug>:-E copy_if_different> "$<TARGET_FILE_DIR:fep3_system>/fep3_system$<$<CONFIG:Debug>:d>${fep3_system_pdb_version_str}.$<$<CONFIG:Debug>:pdb>" "${TARGET_FOLDER}"
-                COMMAND "$<$<CONFIG:Debug>:${CMAKE_COMMAND}>$<$<NOT:$<CONFIG:Debug>>:echo>" $<$<CONFIG:Debug>:-E copy_if_different> "$<TARGET_FILE_DIR:fep3_http_service_bus>/fep3_http_service_bus.$<$<CONFIG:Debug>:pdb>" "${TARGET_FOLDER}/http"
-            )
+                COMMAND ${CMAKE_COMMAND} -E $<IF:$<OR:$<CONFIG:RelWithDebInfo>,$<CONFIG:Debug>>,copy_if_different,true>
+                $<TARGET_FILE_DIR:fep3_system>/fep3_system$<$<CONFIG:Debug>:d>${fep3_system_pdb_version_str}.$<$<OR:$<CONFIG:RelWithDebInfo>,$<CONFIG:Debug>>:pdb> ${TARGET_FOLDER}
+             )
         endif()
-    endif()
 
+       fep3_system_plugins_deploy_helper(${NAME} ${TARGET_FOLDER})
+
+    endif()
 
     set_target_properties(${NAME} PROPERTIES INSTALL_RPATH "$ORIGIN")
 endmacro(fep3_system_deploy_helper NAME)
+
+macro(fep3_system_plugins_deploy_helper NAME TARGET_FOLDER)
+
+    add_custom_command(TARGET ${NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${TARGET_FOLDER}/http"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${TARGET_FOLDER}/rti"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:fep3_http_service_bus>" "${TARGET_FOLDER}/http"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:fep3_dds_service_bus_plugin>" "${TARGET_FOLDER}/rti"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE_DIR:fep3_system>/fep3_system.fep_components" "${TARGET_FOLDER}"
+    )
+    if(MSVC)
+        add_custom_command(TARGET ${NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E $<IF:$<OR:$<CONFIG:RelWithDebInfo>,$<CONFIG:Debug>>,copy_if_different,true>  "$<TARGET_FILE_DIR:fep3_http_service_bus>/fep3_http_service_bus.$<$<OR:$<CONFIG:RelWithDebInfo>,$<CONFIG:Debug>>:pdb>" "${TARGET_FOLDER}/http"
+            COMMAND ${CMAKE_COMMAND} -E $<IF:$<OR:$<CONFIG:RelWithDebInfo>,$<CONFIG:Debug>>,copy_if_different,true>  "$<TARGET_FILE_DIR:fep3_dds_service_bus_plugin>/fep3_dds_service_bus_plugin.$<$<OR:$<CONFIG:RelWithDebInfo>,$<CONFIG:Debug>>:pdb>" "${TARGET_FOLDER}/rti"
+        )
+    endif()
+
+    if("${PROJECT_NAME}" STREQUAL "fep3-system-library")
+
+        # if this is called from fep system directly it can call the participant macro.
+        internal_fep3_participant_deploy_dds(${NAME} ${TARGET_FOLDER})
+    else()
+
+        if(MSVC)
+        # if this is called from another project, we have can copy the whole rti folder
+            add_custom_command(TARGET ${NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "$<TARGET_FILE_DIR:fep3_system>/rti" "${TARGET_FOLDER}/rti"
+            )
+        endif()
+    endif()
+endmacro(fep3_system_plugins_deploy_helper)
+
 
 ################################################################################
 ## \page page_cmake_commands

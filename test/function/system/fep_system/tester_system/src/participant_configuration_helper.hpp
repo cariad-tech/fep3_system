@@ -45,7 +45,7 @@ void testGetter(fep3::IConfigurationService& config_service,
 {
     std::string path_with_slashes = deeper_path + "/" + propertyname;
 
-    ASSERT_TRUE(fep3::isOk(fep3::base::setPropertyValue<T>(config_service, path_with_slashes, value)));
+    ASSERT_TRUE(fep3::base::setPropertyValue<T>(config_service, path_with_slashes, value));
 
     auto properties_to_test = rpc_config.getProperties("/" + deeper_path);
     auto property_names = properties_to_test->getPropertyNames();
@@ -68,7 +68,7 @@ void testSetter(fep3::IConfigurationService& config_service,
 {
     std::string propertypath_with_slashes = deeper_path + "/" + propertyname;
 
-    ASSERT_TRUE(fep3::isOk(fep3::base::setPropertyValue<T>(config_service, propertypath_with_slashes, init_value)));
+    ASSERT_TRUE(fep3::base::setPropertyValue<T>(config_service, propertypath_with_slashes, init_value));
 
     auto properties_to_test = rpc_config.getProperties("/" + deeper_path);
     auto property_names = properties_to_test->getPropertyNames();

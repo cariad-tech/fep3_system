@@ -32,7 +32,7 @@ namespace fep3
 {
 namespace rpc
 {
-namespace arya
+namespace catelyn
 {
 /**
  * @brief definition of the external service interface of the data registry
@@ -76,9 +76,9 @@ public:
     virtual std::shared_ptr<fep3::arya::IStreamType> getStreamType(
         const std::string& signal_name) const = 0;
 };
-}
-using arya::IRPCDataRegistry;
-}
-}
+} // catelyn
+using catelyn::IRPCDataRegistry;
+} // rpc
+} // fep3
 
 #endif // __FEP_RPC_PARTICIPANT_INFO_INTF_H

@@ -32,9 +32,8 @@ You may add additional accurate notices of copyright ownership.
 #include <gtest/gtest.h>
 #include <fep_system/fep_system.h>
 #include <string>
-#include "fep_test_common.h"
-#include <a_util/logging.h>
-#include <a_util/process.h>
+#include <fep_test_common.h>
+#include <a_util/system.h>
 
 namespace
 {
@@ -90,13 +89,15 @@ TEST(SystemLibrary, TestParticpantInfo)
     const auto participant_names = std::vector<std::string>{"test_participant1", "test_participant2"};
     const TestParticipants test_parts = createTestParticipants(participant_names, sys_name);
 
-    fep3::System my_system(sys_name);
-    for (const auto &part : test_parts)
-    {
-        my_system.add(part.first);
-    }
+    using namespace std::literals::chrono_literals;
+
+    fep3::System my_system = fep3::discoverSystem(sys_name, participant_names, 10000ms);
     TestEventMonLog test_log;
     my_system.registerMonitoring(test_log);
+
+    ASSERT_TRUE(my_system.getParticipant("test_participant2").loggingRegistered());
+    ASSERT_TRUE(my_system.getParticipant("test_participant1").loggingRegistered());
+
     my_system.load();
     my_system.initialize();
 

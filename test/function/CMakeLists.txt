@@ -12,9 +12,12 @@
 # You may add additional accurate notices of copyright ownership.
 # 
 #
+add_subdirectory(utils)
 add_definitions(-D_TEST_MACROS_INCLUDES_)
 add_subdirectory(system)
-# The determinism tests are not working correctly on Linux
-if(WIN32)
-    add_subdirectory(determinism/src)
-endif(WIN32)
+add_subdirectory(determinism/src)
+add_subdirectory(performance)
+
+if(fep3_system_cmake_python_version)
+    add_subdirectory(python/src)
+endif()

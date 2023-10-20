@@ -23,15 +23,15 @@ You may add additional accurate notices of copyright ownership.
 #include <vector>
 #include <string>
 
-#include "health_service_rpc_intf_def.h"
-#include <a_util/result.h>
-#include "../../base/health/health_types.h"
+#include <fep_system/healthiness_types.h>
+#include <fep3/rpc_services/health/health_service_rpc_intf_def.h>
 
 namespace fep3
 {
-namespace experimental
+namespace rpc
 {
-
+namespace catelyn
+{
 /**
 * @brief definition of the external health service interface of the participant
 * @see health.json file
@@ -50,19 +50,19 @@ public:
      * Resetting the health state to ok indicates all errors have been resolved and the participant
      * works correctly.
      * An error health state should only be reset to health state ok from external using rpc
-     * @param message log message indicating why the health state has been set to ok.
      * @return Result indicating whether setting the health state succeeded or failed.
-     * @retval ERR_NOERROR Health state has been set successfully.
+     * @retval ERR_NOERROR Health state has been reset successfully.
      */
-    virtual a_util::result::Result resetHealth(const std::string& message) = 0;
+    virtual a_util::result::Result resetHealth() = 0;
 
     /**
      * @brief Get the current health state of the participant.
      *
      * @return HealthState The current health state of the participant.
      */
-    virtual HealthState getHealth() const = 0;
+    virtual std::vector<JobHealthiness> getHealth() const = 0;
 };
-//using arya::IRPCHealthService;
-}
-}
+} // namespace catelyn
+using catelyn::IRPCHealthService;
+} //namespace rpc
+} // namespace fep3

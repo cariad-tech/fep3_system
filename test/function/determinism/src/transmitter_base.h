@@ -19,24 +19,33 @@ You may add additional accurate notices of copyright ownership.
 
 
 #include <fep3/cpp/datajob.h>
+#include <fep3/fep3_errors.h>
+#include <fep3/components/logging/logging_service_intf.h>
+#include <fep3/components/logging/easy_logger.h>
 #include "determinism_helper.hpp"
+#include <thread>
 
-class TransmitJobBase : public fep3::cpp::DataJob
+using namespace fep3;
+
+class TransmitJobBase : public cpp::DataJob
 {
 public:
-    TransmitJobBase(fep3::arya::JobConfiguration job_config);
+    TransmitJobBase(const fep3::IComponents& components, const std::string& logger_name);
     virtual ~TransmitJobBase() = 0;
 
     virtual fep3::Result process(fep3::Timestamp time) override;
     virtual fep3::Result reset() override;
 
 protected:
-    fep3::cpp::DataWriter* _data_writer;
-    std::vector<int32_t> _values;
-    uint8_t _selector = 0;
-    uint8_t _counter = 0;
-    fep3::test::TestFileLogger _logger;
-    std::chrono::milliseconds _start_time_ms;
+    cpp::DataWriter* _data_writer;
+    uint32_t _current_data_value{0};
+    uint32_t _sample_counter{ 1 };
+    test::TestFileLogger _data_logger;
 
-    fep3::cpp::PropertyVariable<int32_t> _delay{ 0 };
+    fep3::cpp::PropertyVariable<bool> _verbose{ false };
+    fep3::cpp::PropertyVariable<std::string> _log_file_path_property_variable{};
+    fep3::cpp::PropertyVariable<uint32_t> _number_of_transmissions_property_variable{};
+    fep3::cpp::PropertyVariable<uint64_t> _wait_real_time_ns_property_variable{};
+    uint32_t _number_of_transmissions_done{ 0 };
+    bool _finished{ false };
 };

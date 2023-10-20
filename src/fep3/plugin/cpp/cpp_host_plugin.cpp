@@ -75,23 +75,10 @@ namespace arya
                 + SYMBOL_fep3_plugin_getParticipantLibraryVersion + "' function.");
         }
         _participant_library_version = get_participant_library_version_function();
-
-        auto get_version_namespace_function = get<const char*()>(SYMBOL_fep3_plugin_getVersionNamespace);
-        if(!get_version_namespace_function)
-        {
-            throw std::runtime_error("The plugin '" + file_path + "' does not provide an appropriate '"
-                + SYMBOL_fep3_plugin_getVersionNamespace + "' function.");
-        }
-        _version_namespace = get_version_namespace_function();
     }
 
     HostPlugin::~HostPlugin()
     {}
-
-    std::string HostPlugin::getVersionNamespace() const
-    {
-        return _version_namespace;
-    }
 
 } // namespace arya
 } // namespace cpp

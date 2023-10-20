@@ -26,7 +26,7 @@ You may add additional accurate notices of copyright ownership.
 #include "fep_system_types.h"
 #include "participant_proxy.h"
 #include "base/logging/logging_types.h"
-#include "base/health/health_types.h"
+#include "healthiness_types.h"
 #include "logging_types_legacy.h"
 #include "event_monitor_intf.h"
 
@@ -46,6 +46,13 @@ namespace fep3
      *
      */
     using SystemAggregatedState = fep3::rpc::ParticipantState;
+
+    /**
+     * @brief A map of participant name and participant state.
+     *
+     */
+    using ParticipantStates = std::map<std::string, fep3::rpc::arya::IRPCParticipantStateMachine::State>;
+
     /**
      * @brief System state
      * The aggregated state is always the lowest state of the participants.
@@ -62,33 +69,39 @@ namespace fep3
          *
          */
         SystemState() = default;
+
         /**
          * @brief DTOR
          *
          */
         ~SystemState() = default;
+
         /**
          * @brief Move DTOR
          *
          */
         SystemState(SystemState&&) = default;
+
         /**
          * @brief Copy DTOR
          *
          */
         SystemState(const SystemState&) = default;
+
         /**
          * @brief move assignment
          *
          * @return SystemState&
          */
         SystemState& operator=(SystemState&&) = default;
+
         /**
          * @brief copy assignment
          *
          * @return SystemState&
          */
         SystemState& operator=(const SystemState&) = default;
+
         /**
          * @brief CTOR to set values immediately.
          *
@@ -97,17 +110,20 @@ namespace fep3
          * @param[in] state the aggregated state is always the lowest state of the participants
          */
         SystemState(bool homogeneous, const SystemAggregatedState& state) : _homogeneous(homogeneous), _state(state) {}
+
         /**
          * @brief CTOR to set a homogenous state.
          *
          * @param[in] state the aggregated state is always the lowest state of the participants
          */
         SystemState(const SystemAggregatedState& state) : _homogeneous(true), _state(state) {}
+
         /**
          * @brief homogenous value
          *
          */
         bool _homogeneous;
+
         /**
          * @brief the aggregated state is always the lowest state of the participants
          *
@@ -141,6 +157,11 @@ namespace fep3
         ///Definition of the Aggregated system state
         using AggregatedState = SystemAggregatedState;
 
+        /**
+        * @brief Enum for execution policy in init and stat state transitions.
+        */
+        enum class InitStartExecutionPolicy { sequential, parallel };
+
     public:
         /**
          * @brief Construct a new System object
@@ -149,6 +170,7 @@ namespace fep3
          *         for fep3 the system name will be considered. If empty the system name is really not set!
          */
         System();
+
         /**
          * @brief Construct a new System object
          *
@@ -156,6 +178,7 @@ namespace fep3
          * @remark at the moment of FEP 2 there is no system affiliation implemented within the participants.
          */
         System(const std::string& system_name);
+
         /**
          * @brief Construct a new System object
          *
@@ -164,6 +187,7 @@ namespace fep3
          * @remark at the moment of FEP 2 there is no system affiliation implemented within the participants.
          */
         System(const std::string& system_name, const std::string& system_discovery_url);
+
         /**
          * @brief Copy Construct a new System object
          *
@@ -172,12 +196,14 @@ namespace fep3
          *         This is also a very expensive operation; use move instead if possible!
          */
         System(const System& other);
+
         /**
          * @brief Move construct a new System object
          *
          * @param[in] other the other system object to move from
          */
         System(System&& other);
+
         /**
          * @brief Copy assignment
          *
@@ -187,6 +213,7 @@ namespace fep3
          * @return copied system
          */
         System& operator=(const System& other);
+
         /**
          * @brief Move assignment
          *
@@ -194,6 +221,7 @@ namespace fep3
          * @return moved system
          */
         System& operator=(System&& other);
+
         /**
          * @brief Destroy the System object
          *
@@ -204,11 +232,18 @@ namespace fep3
          * @brief Sets the system state
          * depending on the current state this function will increase or decrease
          * the system state to the given AggregatedState.
-         * Only homogenous system states are valid as starting point.
+         * Heterogeneous system states are supported as well as iterating multiple states at once.
+         * When transitioning a heterogeneous system lowest states will be increased first
+         * and highest states will be decreased last.
+         * For example a system consisting of participant p1 in state unloaded and p2 in state running
+         * which shall be transitioned to state initialized will transition as follows:
+         * p1 -> loaded
+         * p1 -> initialized
+         * p2 -> initialized
          *
          * @param[in] state the aggregated state to set
          * @param[in] timeout the timeout used for each state change
-         * @throw runtime_error if a homogenous state cannot be reached or the starting state is not homogenous
+         * @throw runtime_error if at least one participant is unreachable or the state to be set is invalid
          *
          */
         void setSystemState(System::AggregatedState state,
@@ -221,6 +256,7 @@ namespace fep3
          * @throw throws a logical_error if a participant declined the state change (i.e. it is in the wrong state)
          */
         void load(std::chrono::milliseconds timeout = FEP_SYSTEM_TRANSITION_TIMEOUT) const;
+
         /**
          * @brief sends an unload event to every participant
          *
@@ -228,6 +264,7 @@ namespace fep3
          * @throw throws a logical_error if a participant declined the state change (i.e. it is in the wrong state)
          */
         void unload(std::chrono::milliseconds timeout = FEP_SYSTEM_TRANSITION_TIMEOUT) const;
+
         /**
          * @brief sends a initialize event to every participant
          *
@@ -235,6 +272,7 @@ namespace fep3
          * @throw throws a logical_error if a participant declined the state change (i.e. it is in the wrong state)
          */
         void initialize(std::chrono::milliseconds timeout = FEP_SYSTEM_TRANSITION_TIMEOUT) const;
+
         /**
          * @brief sends a deinitialize event to every participant
          *
@@ -250,6 +288,7 @@ namespace fep3
          * @throw throws a logical_error if a participant declined the state change (i.e. it is in the wrong state)
          */
         void start(std::chrono::milliseconds timeout = FEP_SYSTEM_TRANSITION_TIMEOUT) const;
+
         /**
          * @brief sends a pause event to every participant
          *
@@ -257,6 +296,7 @@ namespace fep3
          * @throw throws a logical_error if a participant declined the state change (i.e. it is in the wrong state)
          */
         void pause(std::chrono::milliseconds timeout = FEP_SYSTEM_TRANSITION_TIMEOUT) const;
+
         /**
          * @brief sends a stop event to every participant
          *
@@ -264,6 +304,7 @@ namespace fep3
          * @throw throws a logical_error if a participant declined the state change (i.e. it is in the wrong state)
          */
         void stop(std::chrono::milliseconds timeout = FEP_SYSTEM_TRANSITION_TIMEOUT) const;
+
         /**
          * @brief sends a shutdown event to every participant
          *
@@ -288,7 +329,58 @@ namespace fep3
         */
         std::vector<ParticipantProxy> getParticipants() const;
 
-       /**
+        /**
+        * @brief set a property of a participant to a specified value
+        *
+        * @param[in] participant_name name of the participant
+        * @param[in] property_path    path and name of the property
+        * @param[in] property_value   value of the property to set
+        * @throw runtime_error        if participant is not found
+        */
+        void setParticipantProperty(const std::string& participant_name,
+                                    const std::string& property_path,
+                                    const std::string& property_value);
+
+        /**
+        * @brief get the value of a property of a participant
+        *
+        * @param[in] participant_name name of the participant
+        * @param[in] property_path    path and name of the property
+        * @return std::string         the value of the requested property
+        * @throw runtime_error        if participant is not found
+        */
+        std::string getParticipantProperty(const std::string& participant_name,
+                                           const std::string& property_path) const;
+
+        /**
+        * @brief get the state of a participant
+        *
+        * @param[in] participant_name   name of the participant
+        * @return SystemAggregatedState the state of the requested participant
+        * @throw runtime_error          if participant is not found
+        */
+        SystemAggregatedState getParticipantState(const std::string& participant_name) const;
+
+        /**
+        * @brief get the state of all participants
+        *
+        * @param[in] timeout timeout for waiting on the response of every participant
+        * @return PartStates the states of all participants of system
+        */
+        ParticipantStates getParticipantStates(std::chrono::milliseconds timeout = FEP_SYSTEM_DEFAULT_TIMEOUT) const;
+
+        /**
+        * @brief set the state of a participant
+        * CAUTION: Does not gurantee that the parcitipant will properly work in the target state
+        *          See documentation of fep system for more details
+        *
+        * @param[in] participant_name   name of the participant
+        * @param[in] participant_state  state of the participant to set
+        * @throw runtime_error          if participant is not found
+        */
+        void setParticipantState(const std::string& participant_name, const SystemAggregatedState participant_state) const;
+
+        /**
         * @c adds the participant to the system
         * @param[in]   participant_name  name of the participant
         * @param[in]   participant_url url of the participant
@@ -379,6 +471,7 @@ namespace fep3
          *
          */
         void configureTiming3NoMaster() const;
+
         /**
          * Configures the timing by setting the participant with the master element name as master.
          *
@@ -392,6 +485,7 @@ namespace fep3
          *
          */
         void configureTiming3ClockSyncOnlyInterpolation(const std::string& master_element_id, const std::string& slave_sync_cycle_time) const;
+
         /**
          * Configures the timing by setting the participant with the master element name as master.
          *
@@ -405,6 +499,7 @@ namespace fep3
          *
          */
         void configureTiming3ClockSyncOnlyDiscrete(const std::string& master_element_id, const std::string& slave_sync_cycle_time) const;
+
         /**
          * Configures the timing by setting the participant with the master element name as master,
          * the master clock is a discrete clock.
@@ -420,6 +515,7 @@ namespace fep3
          *
          */
         void configureTiming3DiscreteSteps(const std::string& master_element_id, const std::string& master_time_stepsize, const std::string& master_time_factor) const;
+
         /**
          * Configures the timing by setting the participant with the master element name as master,
          * the master clock is a discrete clock.
@@ -485,9 +581,8 @@ namespace fep3
         /**
         * Register monitoring listener for state and name changed notifications of the whole system
         *
-        * @param[in] event_listener The listener
-        * @retval true/false        Everything went fine/Something went wrong.
         * On Failure an Incident will be send with a detailed description
+        * @param[in] event_listener The listener
         */
         void registerMonitoring(IEventMonitor& event_listener);
 
@@ -505,6 +600,86 @@ namespace fep3
          */
         void setSeverityLevel(LoggerSeverity severity_level);
 
+        /**
+         * @brief Set the execution policy for initialization and start state transition.
+         *
+         * @param[in] policy policy to use during init and start state transition.
+         * @param[in] thread_count number of threads used to initialize the participants.
+         * @throw runtime_error throws if thread count is 0
+         */
+        void setInitAndStartPolicy(InitStartExecutionPolicy policy, uint8_t thread_count);
+
+        /**
+         * @brief Returns the currennt execution policy for initialization and start state transition.
+         *
+         * @return std::pair<InitStartExecutionPolicy, uint8_t> First pair element is the policy
+         *         and second is the thread count.
+         */
+        std::pair<InitStartExecutionPolicy, uint8_t> getInitAndStartPolicy();
+
+        /**
+         * @brief Returns the participants health.
+         *
+         * @return a map containing the participant name and health
+         * @throw runtime_error throws if health listener is deactivated (using  @ref fep3::System::setHealthListenerRunningStatus) 
+         */
+        std::map<std::string, ParticipantHealth> getParticipantsHealth();
+
+        /**
+         * @brief Sets the time interval after the last notify alive discovery message the participant
+         *  will be considered as alive. Default value is 20 seconds.
+         *
+         * @param[in] liveliness_timeout The time interval in ns.
+         */
+        void setLivelinessTimeout(std::chrono::nanoseconds liveliness_timeout);
+
+        /**
+         * @brief Returns the time interval after the last notify alive discovery message the participant
+         *  will be considered as alive.
+         *
+         * @return std::chrono::nanoseconds the liveliness timeout.
+         */
+        std::chrono::nanoseconds getLivelinessTimeout() const;
+
+        /**
+         * Activates or deactivates the health listener. Per default the health listener is activated.
+         * Deactivation will reduce the load of the system, since the polling of each participants health
+         * with RPC calls is deactivated.
+         * In case the listener is deactivated, polling the participants health with
+         * @ref fep3::System::getParticipantsHealth, will result in exception.
+         *
+         * @param[in] running Set to true to activate the health listener and false to deactivate.
+         */
+        void setHealthListenerRunningStatus(bool running);
+
+        /**
+         * Returns the running state of the participants' health listeners.
+         *
+         * @return std::pair<bool, bool>, the first value of the pair indicates if all the
+         * participants health listeners have the same running state. The second value indicates the
+         * participants health listeners' running state (in case the first value is not true, the second value
+         * is undefined).
+         */
+        std::pair<bool, bool> getHealthListenerRunningStatus() const;
+
+        /**
+         * @brief Set the heartbeat interval of one participant
+         *
+         * @param[in] participants participant names in a vector
+         * @param[in] interval_ms heartbeat interval in milliseconds
+         * @throw runtime_error throws if call to one of the discovered participants is not successful 
+         */
+        void setHeartbeatInterval(const std::vector<std::string>& participants, const std::chrono::milliseconds interval_ms);
+
+        /**
+         * @brief Get the Heartbeat interval of one participant
+         *
+         * @param[in] participant participant name
+         * @return std::chrono::milliseconds the liveliness timeout.
+         * @throw runtime_error throws if call to the participant is not successful
+         */
+        std::chrono::milliseconds getHeartbeatInterval(const std::string& participant) const;
+
         /// @cond no_doc
         protected:
             struct Implementation;
@@ -512,148 +687,9 @@ namespace fep3
         /// @endcond no_doc
     };
 
-namespace experimental
-{
     /**
-     * @brief The aggregated system health state as participant health state.
+     * @fn System discoverSystem(std::string name, std::chrono::milliseconds timeout)
      *
-     */
-    using SystemAggregatedHealthState = experimental::HealthState;
-    /**
-     * @brief System health state
-     * The aggregated health state is always the highest state of the participants.
-     * If the system health state is homogeneous,
-     * then every participant in the system has the same participant health state.
-     */
-    struct SystemHealthState
-    {
-        /**
-         * @brief CTOR
-         *
-         */
-        SystemHealthState() = default;
-        /**
-         * @brief DTOR
-         *
-         */
-        ~SystemHealthState() = default;
-        /**
-         * @brief Move DTOR
-         *
-         */
-        SystemHealthState(SystemHealthState&&) = default;
-        /**
-         * @brief Copy DTOR
-         *
-         */
-        SystemHealthState(const SystemHealthState&) = default;
-        /**
-         * @brief move assignment
-         *
-         * @return SystemHealthState
-         */
-        SystemHealthState& operator=(SystemHealthState&&) = default;
-        /**
-         * @brief copy assignment
-         *
-         * @return SystemHealthState
-         */
-        SystemHealthState& operator=(const SystemHealthState&) = default;
-        /**
-         * @brief CTOR to set values immediately.
-         *
-         * @param[in] homogeneous if the system health state is homogeneous,
-         *                    then every participant in the system has the same participant health state
-         * @param[in] system_health_state the aggregated health state is always the highest health state of the participants
-         */
-        SystemHealthState(bool homogeneous, const SystemAggregatedHealthState& system_health_state) : _homogeneous(homogeneous), _system_health_state(system_health_state) {}
-        /**
-         * @brief CTOR to set a homogenous health state.
-         *
-         * @param[in] system_health_state the aggregated health state is always the highest health state of the participants
-         */
-        SystemHealthState(const SystemAggregatedHealthState& system_health_state) : _homogeneous(true), _system_health_state(system_health_state) {}
-        /**
-         * @brief homogenous value
-         *
-         */
-        bool _homogeneous;
-        /**
-         * @brief the aggregated health state is always the highest health state of the participants
-         *
-         */
-        SystemAggregatedHealthState _system_health_state;
-    };
-
-    /**
-     * @brief fep3::experimental::System is a System class which derives from fep3::System
-     * and contains additional experimental functionality. This functionality is not stable yet
-     * and likely to change in the future.
-     */
-    class FEP3_SYSTEM_EXPORT System : public fep3::System
-    {
-    public:
-        /**
-         * @brief CTOR
-         *
-         */
-        System();
-
-        /**
-         * @brief CTOR
-         *
-         * @param[in]  system_name the name of the system to construct
-         */
-        System(const std::string& system_name);
-
-        /**
-         * @brief CTOR
-         *
-         * @param[in]  system_name the name of the system to construct
-         * @param[in]  system_discovery_url the url for discovery of the system
-         */
-        System(const std::string& system_name, const std::string& system_discovery_url);
-
-        /**
-         * @brief DTOR
-         *
-         */
-        virtual ~System();
-
-        /**
-         * @brief Get the health state of a specific participant.
-         *
-         * @param participant_name the name of the participant to retrieve the health state for
-         * @return HealthState the participant health state retrieved
-         */
-        experimental::HealthState getHealth(const std::string& participant_name) const;
-
-        /**
-         * @brief Get the system health state.
-         * The system health state is equal to the worst participant health state of the system.
-         *
-         * @return SystemHealthState the system health state retrieved
-         */
-        experimental::SystemHealthState getSystemHealth() const;
-
-        /**
-         * Reset the health state of a specific participant to ok.
-         *
-         * @param participant_name the name of the participant to set the health state for
-         * @param message message indicating the reason for the health state change
-         * @return Result indicating whether the rpc call succeeded or failed
-         * @retval ERR_NOERROR in case of successful rpc call
-         */
-        a_util::result::Result resetHealth(const std::string& participant_name, const std::string& message);
-        /// @cond no_doc
-        private:
-            struct Implementation;
-            std::unique_ptr<Implementation> _impl;
-        /// @endcond no_doc
-    };
-} // namespace experimental
-
-    /**
      * discoverSystem discovers all participants which are added to the system named by @p name.
      * The default url will be taken which is provided by fep participant library.
      *
@@ -668,6 +704,56 @@ namespace experimental
         std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
 
     /**
+     * @fn System discoverSystem(std::string name,
+     *   std::vector<std::string> participant_names,
+     *   std::chrono::milliseconds timeout)
+     *
+     * discoverSystem discovers all participants which are added to the system named by @p name.
+     * The default url will be taken which is provided by fep participant library. The discovery will return
+     * once at least the participants by @p participant_names are discovered or the discovery time
+     * defined by @p timeout expired.
+     *
+     * It will use the default service bus discovery provided by the fep participant library
+     *
+     * @param[in] name name of the system which is discovered
+     * @param[in] participant_names names of the participants to be discovered
+     * @param[in] timeout (ms) total time that discovery can take; has to be positive
+     * @return Discovered system
+     * @throw runtime_error throws if one of the discovered participants is not available or not all
+     * participants defined in @p participant_names are discovered at the end of the timeout.
+     */
+    System FEP3_SYSTEM_EXPORT discoverSystem(std::string name,
+        std::vector<std::string> participant_names,
+        std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
+
+    /**
+     * @fn System discoverSystem(std::string name,
+     *   uint32_t participant_count,
+     *   std::chrono::milliseconds timeout)
+     *
+     * discoverSystem discovers all participants which are added to the system named by @p name.
+     * The default url will be taken which is provided by fep participant library. The discovery will return
+     * once at least the number of participants set by @p participant_count are discovered or the discovery time
+     * defined by @p timeout expired.
+     *
+     * It will use the default service bus discovery provided by the fep participant library
+     *
+     * @param[in] name name of the system which is discovered
+     * @param[in] participant_count the number of participants that have to discovered for the discovery to stop.
+     * @param[in] timeout (ms) total time that discovery can take; has to be positive
+     * @return Discovered system
+     * @throw runtime_error throws if one of the discovered participants is not available or the number of
+     * participants defined in @p participant_count is not discovered at the end of the timeout.
+     */
+    System FEP3_SYSTEM_EXPORT discoverSystem(std::string name,
+        uint32_t participant_count,
+        std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
+
+    /**
+     * @fn System discoverSystemByURL(std::string name,
+     *   std::string discover_url,
+     *   std::chrono::milliseconds timeout)
+     *
      * discoverSystemByURL discovers all participants which are added to the system named by @p name
      * which are discoverable on the given \p discover_url .
      *
@@ -682,7 +768,63 @@ namespace experimental
     System FEP3_SYSTEM_EXPORT discoverSystemByURL(std::string name,
         std::string discover_url,
         std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
+
     /**
+     * @fn System discoverSystemByURL(std::string name,
+     *   std::string discover_url,
+     *   std::vector<std::string> participant_names,
+     *   std::chrono::milliseconds timeout)
+     *
+     * discoverSystemByURL discovers all participants that are added to the system named by @p name,
+     * which are discoverable on the given \p discover_url. The discovery will return
+     * once at least the participants given by @p participant_names are discovered or the discovery time
+     * defined by @p timeout expired.
+     *
+     * It will use the default service bus discovery provided by the fep participant library
+     *
+     * @param name name of the system which is discovered
+     * @param[in]   discover_url   url where the systems can be discovered
+     * @param participant_names names of the participants to be discovered
+     * @param timeout (ms) total time that discovery can take; has to be positive
+     * @return Discovered system
+     * @throw runtime_error throws if one of the discovered participants is not available or not all
+     * participants defined in @p participant_names are discovered at the end of the timeout.
+     */
+    System FEP3_SYSTEM_EXPORT discoverSystemByURL(std::string name,
+        std::string discover_url,
+        std::vector<std::string> participant_names,
+        std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
+
+    /**
+     * @fn System discoverSystemByURL(std::string name,
+     *   std::string discover_url,
+     *   uint32_t participant_count,
+     *   std::chrono::milliseconds timeout)
+     * 
+     * discoverSystemByURL discovers all participants that are added to the system named by @p name,
+     * which are discoverable on the given \p discover_url. The discovery will return
+     * once at least the number of participants given by @p participant_count are discovered or the discovery time
+     * defined by @p timeout expired.
+     *
+     * It will use the default service bus discovery provided by the fep participant library
+     *
+     * @param name name of the system which is discovered
+     * @param[in]   discover_url   url where the systems can be discovered
+     * @param[in] participant_count the number of participants that have to discovered for the discovery to stop.
+     * @param[in] timeout (ms) total time that discovery can take; has to be positive
+     * @return Discovered system
+     * @throw runtime_error throws if one of the discovered participants is not available or the number of
+     * participants defined in @p participant_count is not discovered at the end of the timeout.
+     */
+    System FEP3_SYSTEM_EXPORT discoverSystemByURL(std::string name,
+        std::string discover_url,
+        uint32_t participant_count,
+        std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
+
+    /**
+     * @fn System discoverAllSystems(
+     *   std::chrono::milliseconds timeout)
+     *
      * discoverAllSystems discovers all participants at all systems on the default discovery url.
      * The default url will be taken which is provided by fep participant library.
      *
@@ -696,12 +838,38 @@ namespace experimental
     std::vector<System> FEP3_SYSTEM_EXPORT discoverAllSystems(std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
 
     /**
-    * Loads the service bus plugin.
-    */
-    void FEP3_SYSTEM_EXPORT preloadServiceBusPlugin();
+     * @fn System discoverAllSystems(
+     *  uint32_t participant_count,
+     *   std::chrono::milliseconds timeout)
+     *
+     * discoverAllSystems discovers all participants at all systems on the default discovery url.
+     * The default url will be taken which is provided by fep participant library. The discovery will return
+     * once at least the participants given by @p participant_names are discovered or the discovery time
+     * defined by @p timeout expired.
+     *
+     * It will use the default service bus discovery provided by the fep participant library
+     * @param[in] participant_count the number of participants that have to discovered for the discovery to stop.
+     * @param[in]   timeout   (ms) timeout for remote request; has to be positive
+     * @return vector of discovered systems
+     * @throw runtime_error throws if one of the discovered participants is not available
+     * (for filtering of standalone participants) or the number of
+     * participants defined in @p participant_count is not discovered at the end of the timeout.
+     */
+    std::vector<System> FEP3_SYSTEM_EXPORT discoverAllSystems(
+        uint32_t participant_count,
+        std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
 
     /**
-     * discoverAllSystemsByURL discovers all participants at all system
+    * Loads the service bus plugin.
+    */
+    FEP3_SYSTEM_EXPORT void preloadServiceBusPlugin();
+
+    /**
+     * @fn System discoverAllSystemsByURL(
+     *   std::string discover_url,
+     *   std::chrono::milliseconds timeout)
+     *
+     * discoverAllSystemsByURL discovers all participants at all systems
      * which are discoverable on the given \p discover_url
      *
      * It will use the default service bus discovery provided by the fep participant library.
@@ -714,5 +882,48 @@ namespace experimental
      */
     std::vector<System> FEP3_SYSTEM_EXPORT discoverAllSystemsByURL(std::string discover_url,
         std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
+
+    /**
+     * @fn System discoverAllSystemsByURL(
+     *   std::string discover_url,
+     *   uint32_t participant_count,
+     *   std::chrono::milliseconds timeout)
+     *
+     * discoverAllSystemsByURL discovers all participants at all systems
+     * which are discoverable on the given \p discover_url. The discovery will return
+     * once at least the number of participants given by @p participant_count are discovered or the discovery time
+     * defined by @p timeout expired.
+     *
+     * It will use the default service bus discovery provided by the fep participant library.
+     *
+     * @param[in]   discover_url   url where the systems can be discovered
+     * @param[in] participant_count the number of participants that have to discovered for the discovery to stop.
+     * @param[in]   timeout   (ms) timeout for remote request; has to be positive
+     * @return vector of discovered systems
+     * @throw runtime_error throws if one of the discovered participants is not available
+     * (for filtering of standalone participants)  or the number of
+     * participants defined in @p participant_count is not discovered at the end of the timeout.
+     */
+    std::vector<System> FEP3_SYSTEM_EXPORT discoverAllSystemsByURL(std::string discover_url,
+        uint32_t participant_count,
+        std::chrono::milliseconds timeout = FEP_SYSTEM_DISCOVER_TIMEOUT);
+
+    /**
+     * @fn SystemAggregatedState getSystemAggregatedStateFromString(const std::string& state_string)
+     * Converts a std::string to ::SystemAggregatedState
+     *
+     * @param[in] state_string string to be converted
+     * @return the std::string converted to the enum, returns fep3::SystemAggregatedState::undefined if conversion failed.
+     */
+    SystemAggregatedState FEP3_SYSTEM_EXPORT getSystemAggregatedStateFromString(const std::string& state_string);
+
+    /**
+     * @fn std::string systemAggregatedStateToString(const fep3::System::AggregatedState state)
+     * Converts a ::SystemAggregatedState to std::string
+     *
+     * @param[in] state
+     * @return The enum converted to std::string, "NOT RESOLVABLE" if conversion failed.
+     */
+    std::string FEP3_SYSTEM_EXPORT systemAggregatedStateToString(const fep3::System::AggregatedState state);
 
 }

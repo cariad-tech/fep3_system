@@ -1,21 +1,20 @@
 #
 # Copyright @ 2021 VW Group. All rights reserved.
-# 
+#
 #     This Source Code Form is subject to the terms of the Mozilla
 #     Public License, v. 2.0. If a copy of the MPL was not distributed
 #     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-# 
+#
 # If it is not possible or desirable to put the notice in a particular file, then
 # You may include the notice in a location (such as a LICENSE file in a
 # relevant directory) where a recipient would be likely to look for such a notice.
-# 
+#
 # You may add additional accurate notices of copyright ownership.
-# 
+#
 #
 cmake_minimum_required(VERSION 3.17.0 FATAL_ERROR)
 cmake_policy(SET CMP0011 NEW)
 
-# Disable extensions here and require the chosen CMAKE_CXX_STANDARD (coming from Conan)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if (NOT DEFINED CMAKE_CXX_STANDARD)
@@ -35,7 +34,6 @@ set(FEP3_SYSTEM_LIBRARY fep3_system)
 set(FEP3_SYSTEM_LIB_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(FEP3_SYSTEM_LIB_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(FEP3_SYSTEM_LIB_VERSION_PATCH ${PROJECT_VERSION_PATCH})
-set(DOXYGEN_WARN_IF_UNDOCUMENTED "Yes")
 
 set(FEP3_SYSTEM_LIB_VERSION "${FEP3_SYSTEM_LIB_VERSION_MAJOR}.${FEP3_SYSTEM_LIB_VERSION_MINOR}.${FEP3_SYSTEM_LIB_VERSION_PATCH}")
 
@@ -49,33 +47,6 @@ else()
     add_compile_options(-Wall -Wno-unknown-pragmas -Wno-reorder -Werror -Wextra -pedantic -Wno-comment)
 endif()
 
-# check for conan
-if(NOT CONAN_COMPILER)
-    message(WARNING "Very good hint: FEP3 System Library should not be built without conan!")
-endif()
-if(CONAN_COMPILER)
-    message(STATUS "Including Conan build info")
-    if ( EXISTS ${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo.cmake)
-        include(${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo.cmake)
-    elseif ( EXISTS ${CMAKE_CURRENT_BINARY_DIR}/../conanbuildinfo.cmake)
-        include(${CMAKE_CURRENT_BINARY_DIR}/../conanbuildinfo.cmake)
-    elseif ( EXISTS ${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo_multi.cmake)
-        include(${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo_multi.cmake)
-    elseif ( EXISTS ${CMAKE_CURRENT_BINARY_DIR}/../conanbuildinfo_multi.cmake)
-        include(${CMAKE_CURRENT_BINARY_DIR}/../conanbuildinfo_multi.cmake)
-    else()
-        message(FATAL_ERROR "Conan build info can't be found.")
-    endif()
-
-    if(CORTEX_WORKSPACE)
-        conan_basic_setup(TARGETS)
-    else()
-        conan_basic_setup(TARGETS NO_OUTPUT_DIRS)
-    endif()
-
-    set(DOXYGEN_ROOT ${CONAN_DOXYGEN_ROOT})
-endif()
-
 option(fep3_system_cmake_enable_documentation
        "If enabled, generate the source code documentation -\
  requires doxygen and sphinx-build (default: ON)" ON)
@@ -84,6 +55,7 @@ option(fep3_system_cmake_enable_tests
 
 include(scripts/cmake/enable_multicore_compilation.cmake)
 include(scripts/cmake/use_integrated_debug_symbols.cmake)
+include(scripts/cmake/set_boost_interface_targets.cmake)
 
 set(fep3_system_pdb_version_str ${FEP3_SYSTEM_LIB_VERSION_MAJOR}.${FEP3_SYSTEM_LIB_VERSION_MINOR})
 include(src/fep_system/fep3_system-macros.cmake)
@@ -98,7 +70,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS true)
 ### Product specific
 set(FEP3_SYSTEM_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(BETA_BUILD false CACHE BOOL "Mark as beta")
-set(REFERENCE_VERSION ${CONAN_PACKAGE_VERSION})
 
 # some settings need to be set explicitly for QNX
 if (UNIX)
@@ -107,9 +78,20 @@ if (UNIX)
     set(CMAKE_SKIP_BUILD_RPATH  OFF)
 endif(UNIX)
 
-find_package(dev_essential REQUIRED COMPONENTS datetime system datetime process strings xml pkg_rpc)
-find_package(fep3_participant REQUIRED)
-set(PARTICIPANT_LIB_DIR ${fep3_participant_DIR})
+if(NOT TARGET dev_essential)
+    find_package(dev_essential REQUIRED COMPONENTS datetime system datetime process strings xml pkg_rpc)
+else()
+    include(${dev_essential_SOURCE_DIR}/scripts/cmake/stub_generation.cmake)
+endif()
+
+if(NOT TARGET fep3_participant)
+    find_package(fep3_participant REQUIRED)
+    set(fep3_participant_ROOT ${fep3_participant_DIR})
+else()
+    get_target_property(FEP3_PARTICIPANT_SOURCE_DIR fep3_participant SOURCE_DIR)
+    set(fep3_participant_ROOT ${FEP3_PARTICIPANT_SOURCE_DIR}/../..)
+endif()
+get_target_property(fep3_participant_INCLUDE_DIR fep3_participant INTERFACE_INCLUDE_DIRECTORIES)
 
 ################################################################################
 ### Setting up packages
@@ -129,28 +111,37 @@ install(
     DESTINATION include/fep_system
 )
 
-find_package(Boost REQUIRED)
-message("BOOST INCLUDE DIR PROCESS ${Boost_INCLUDE_DIR}")
 # add subdirectories core
 add_subdirectory(src)
 if (fep3_system_cmake_enable_documentation)
     add_subdirectory(doc)
 endif()
 
-install(FILES README.md
-        DESTINATION .
+install(
+    FILES
+        README.md
+    DESTINATION
+        .
 )
-install(FILES LICENSE.md
-        DESTINATION doc/license
+install(
+    FILES
+        LICENSE.md
+        doc/license/license_notes_from_aosd.txt
+    DESTINATION
+        doc/license
+)
+install(
+    FILES
+        doc/changelog.md
+    DESTINATION
+        doc
 )
 
-install(FILES doc/license/license_notes_from_aosd.txt
-        DESTINATION doc/license
-)
-
-if (fep3_system_cmake_enable_tests)
-    enable_testing()
-    set(FEP3_TESTS_INTEGRATED true)
+if (fep3_system_cmake_enable_tests OR fep3_system_export_test_targets)
+    if(fep3_system_cmake_enable_tests)
+        enable_testing()
+        set(FEP3_TESTS_INTEGRATED true)
+    endif()
     add_subdirectory(test)
 endif()
 

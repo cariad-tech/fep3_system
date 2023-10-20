@@ -71,7 +71,7 @@ public:
     bool call(const std::string & request, std::string & response)
     {
         ResponseHelper response_helper(response);
-        return a_util::result::isOk(_rpc_requester->sendRequest(_service_name, request, response_helper));
+        return static_cast<bool>(_rpc_requester->sendRequest(_service_name, request, response_helper));
     }
 
 public: // implement IRPCServiceClient
