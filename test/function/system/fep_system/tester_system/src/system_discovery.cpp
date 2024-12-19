@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
@@ -22,8 +11,7 @@ You may add additional accurate notices of copyright ownership.
 #include <fep_system/fep_system.h>
 #include <string.h>
 #include <fep_test_common.h>
-#include "a_util/logging.h"
-#include "a_util/process.h"
+#include <a_util/process.h>
 #include <boost/dll.hpp>
 
 #include <a_util/xml.h>
@@ -102,48 +90,6 @@ namespace
         }
     }
 }
-/**
- * @req_id FEPSDK-2128
- */
-/*
-TEST_F(TestSystemDiscovery, StandaloneModulesWillNotBeDiscovered)
-{
-    const auto participant_names = std::vector<std::string>
-        { "standalone_participant"
-        , "participant_no_standalone_path"
-        , "participant3" };
-
-    const Modules modules = createTestModules(participant_names);
-
-    ASSERT_EQ(
-        modules.at("standalone_participant")->GetPropertyTree()->SetPropertyValue(FEP_STM_STANDALONE_PATH, true),
-        a_util::result::Result());
-
-    ASSERT_EQ(
-        modules.at("participant_no_standalone_path")->GetPropertyTree()->DeleteProperty(FEP_STM_STANDALONE_PATH),
-        a_util::result::Result());
-
-    /// discover
-    const auto domain_id = modules.begin()->second->GetDomainId();
-    fep::System my_system = fep::discoverSystemOnDDS("my_system", domain_id, 1000);
-    const auto discovered_participants = my_system.getParticipants();
-
-    /// compare with expectation
-    const std::vector<std::string> discoverd_names = [discovered_participants]() {
-        std::vector<std::string> temp;
-        std::transform
-        (discovered_participants.begin()
-            , discovered_participants.end()
-            , std::back_inserter(temp)
-            , [](decltype(discovered_participants)::value_type participant)
-        {
-            return participant.getName();
-        }
-        );
-        return temp;
-    }();
-    EXPECT_EQ(discoverd_names, std::vector<std::string>({"participant3", "participant_no_standalone_path"}));
-}*/
 
 void testDiscoverSystem(const fep3::System& system, const std::vector<std::string>& participant_names)
 {

@@ -1,15 +1,8 @@
+# Copyright 2023 CARIAD SE. 
 #
-# Copyright @ 2021 VW Group. All rights reserved.
-#
-#     This Source Code Form is subject to the terms of the Mozilla
-#     Public License, v. 2.0. If a copy of the MPL was not distributed
-#     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# If it is not possible or desirable to put the notice in a particular file, then
-# You may include the notice in a location (such as a LICENSE file in a
-# relevant directory) where a recipient would be likely to look for such a notice.
-#
-# You may add additional accurate notices of copyright ownership.
+# This Source Code Form is subject to the terms of the Mozilla
+# Public License, v. 2.0. If a copy of the MPL was not distributed
+# with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 #
 option(fep3_system_cmake_enable_functional_tests
@@ -53,8 +46,19 @@ if(NOT TARGET fep3_participant_core)
     find_package(fep3_participant_core REQUIRED)
 endif()
 
+find_package(GTest)
+if(TARGET GTest::gtest_main)
+    message(STATUS "Found GTest")
+    if(TARGET GTest::gmock)
+        message(STATUS "Found GMock")
+    else()
+        message(STATUS "Could NOT find GMock")
+    endif()
+else()
+    message(STATUS "Could NOT find GTest")
+endif()
 
-find_package(GTest REQUIRED COMPONENTS gtest gtest_main gmock gmock_main)
+include(GoogleTest)
 
 # for test_setup.h
 include_directories(${CMAKE_CURRENT_LIST_DIR})

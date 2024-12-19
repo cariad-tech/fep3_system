@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
@@ -27,7 +16,6 @@ You may add additional accurate notices of copyright ownership.
 #include "fep_system_stubs/logging_sink_service_stub.h"
 #include "system_logger_intf.h"
 
-#include <a_util/strings.h>
 
 namespace fep3
 {
@@ -74,7 +62,7 @@ public:
                 static_cast<int>(configuration._severity));
             if (retval)
             {
-                _logger.log(
+                _logger.logProxyError(
                     LoggerSeverity::error,
                     _participant_name,
                     "logging_service",
@@ -84,7 +72,7 @@ public:
         }
         catch (...)
         {
-            _logger.log(
+            _logger.logProxyError(
                 LoggerSeverity::fatal,
                 _participant_name,
                 "logging_service",
@@ -107,7 +95,7 @@ public:
         }
         catch (...)
         {
-            _logger.log(
+            _logger.logProxyError(
                 LoggerSeverity::fatal,
                 _participant_name,
                 "logging_service",
@@ -125,7 +113,7 @@ public:
         }
         catch (...)
         {
-            _logger.log(
+            _logger.logProxyError(
                 LoggerSeverity::fatal,
                 _participant_name,
                 "logging_service",
@@ -143,7 +131,7 @@ public:
         }
         catch (...)
         {
-            _logger.log(
+            _logger.logProxyError(
                 LoggerSeverity::fatal,
                 _participant_name,
                 "logging_service",
@@ -285,6 +273,77 @@ private:
 using LoggingSinkServiceProxy
 = RPCServiceClientProxy< rpc_proxy_stub::RPCLoggingSinkService,
     IRPCLoggingSinkService >;
+
+// prevents deregistration of the proxy from the participant rpc logging sink
+// when other logging proxies are registered.
+class RPCLoggingSinkRegistrationSingleton
+{
+public:
+    RPCLoggingSinkRegistrationSingleton(RPCLoggingSinkRegistrationSingleton const&) = delete;
+    RPCLoggingSinkRegistrationSingleton& operator=(RPCLoggingSinkRegistrationSingleton const&) = delete;
+
+    static RPCLoggingSinkRegistrationSingleton* getInstance()
+    {
+        // Static local variable initialization is thread-safe
+        // and will be initialized only once.
+        static RPCLoggingSinkRegistrationSingleton instance{};
+        return &instance;
+    }
+
+    fep3::Result registerRPCClient(RPCComponent<IRPCLoggingSinkService>& logging_sink_service, const std::string &url,
+        const std::string participant_name, const std::string &system_name)
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        const std::string multiplexed_name = url + "@" + system_name + "@" + participant_name;
+
+        if (const auto return_code = logging_sink_service->registerRPCClient(url); return_code == 0)
+        {
+            ++(_client_count[multiplexed_name]);
+        }
+        else
+        {
+            RETURN_ERROR_DESCRIPTION(
+                fep3::ERR_FAILED,
+                std::string("Registration of rpc client for: " + multiplexed_name + " failed with return code: " + std::to_string(return_code))
+                .c_str());
+        }
+
+        return {};
+    }
+
+    fep3::Result unregisterRPCClient(RPCComponent<IRPCLoggingSinkService>& logging_sink_service, const std::string &url,
+        const std::string participant_name, const std::string &system_name)
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        const std::string multiplexed_name = url + "@" + system_name + "@" + participant_name;
+        
+        if (_client_count[multiplexed_name] == 1)
+        {
+            if (const auto return_code = logging_sink_service->unregisterRPCClient(url); return_code == 0)
+            {
+                --(_client_count[multiplexed_name]);
+            }
+            else
+            {
+                RETURN_ERROR_DESCRIPTION(
+                    fep3::ERR_FAILED,
+                    std::string("Deregistration of rpc client for: " + multiplexed_name + " failed with return code: " + std::to_string(return_code))
+                    .c_str());
+            }
+        }
+        else if (_client_count[multiplexed_name] > 1)
+        {
+            --(_client_count[multiplexed_name]);
+        }
+
+        return {};
+    }
+
+private:
+    RPCLoggingSinkRegistrationSingleton() {}
+    std::mutex _mutex;
+    std::map<std::string, uint32_t> _client_count;
+};
 
 class LoggingSinkService : public LoggingSinkServiceProxy
 {

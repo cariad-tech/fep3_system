@@ -1,28 +1,16 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
 #include <gtest/gtest.h>
 #include <fep_system/fep_system.h>
 #include "fep_test_common.h"
-//#include <a_util/process.h>
-#include <a_util/filesystem.h>  // for replacement implementation
+#include <fep3/fep3_filesystem.h>
 
 
 struct SystemLibraryWithTestSystem : public ::testing::Test {
@@ -46,29 +34,15 @@ struct SystemLibraryWithTestSystem : public ::testing::Test {
 
 TEST_F(SystemLibraryWithTestSystem, TestPybind11)
 {
-    // due to a bug in a_util::process::execute does not work
-    // switch to this implementation, when the bug has been fixed
-    /*// call python and execute testcases
-    std::string std_out;
-    uint32_t res = a_util::process::execute(PYTHON_EXECUTABLE,
-        "-m pytest -q " PYTESTS_TESTS_DIR "/tester_system.py", WORKING_DIRECTORY, std_out);
+    const auto current_dir = fs::current_path();
+    const auto working_dir = fs::path(WORKING_DIRECTORY);
+    ASSERT_TRUE(fs::exists(working_dir));
+    ASSERT_NO_THROW(fs::current_path(working_dir));
+    const std::string cmd = std::string(ACTIVATE_VENV_EXEC) + " && python -m pytest -q " + std::string(PYTESTS_TESTS_DIR) + "/tester_system.py -W ignore::pytest.PytestCollectionWarning";
+    int res = system(cmd.c_str());
 
-    // on error print error message
-    if (res) {
-        std::cout << std_out << std::endl;
-    }*/
-
-    // replacement implementation for bug in a_util::process::execute
-    auto current_dir = a_util::filesystem::getWorkingDirectory();
-    a_util::filesystem::setWorkingDirectory(WORKING_DIRECTORY);
-    int res = system("\"" PYTHON_EXECUTABLE "\"" " -m pytest -q " PYTESTS_TESTS_DIR
-        "/tester_system.py -W ignore::pytest.PytestCollectionWarning");
-    a_util::filesystem::setWorkingDirectory(current_dir);
+    fs::current_path(current_dir);
 
     EXPECT_FALSE(res);
 
 }
-
-/*TEST(SystemLibrary, TestMonitorSystemOK)
-{
-}*/

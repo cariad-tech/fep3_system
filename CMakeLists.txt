@@ -1,17 +1,9 @@
+# Copyright 2023 CARIAD SE. 
 #
-# Copyright @ 2021 VW Group. All rights reserved.
-#
-#     This Source Code Form is subject to the terms of the Mozilla
-#     Public License, v. 2.0. If a copy of the MPL was not distributed
-#     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# If it is not possible or desirable to put the notice in a particular file, then
-# You may include the notice in a location (such as a LICENSE file in a
-# relevant directory) where a recipient would be likely to look for such a notice.
-#
-# You may add additional accurate notices of copyright ownership.
-#
-#
+# This Source Code Form is subject to the terms of the Mozilla
+# Public License, v. 2.0. If a copy of the MPL was not distributed
+# with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 cmake_minimum_required(VERSION 3.17.0 FATAL_ERROR)
 cmake_policy(SET CMP0011 NEW)
 
@@ -79,7 +71,7 @@ if (UNIX)
 endif(UNIX)
 
 if(NOT TARGET dev_essential)
-    find_package(dev_essential REQUIRED COMPONENTS datetime system datetime process strings xml pkg_rpc)
+    find_package(dev_essential REQUIRED COMPONENTS strings xml pkg_rpc)
 else()
     include(${dev_essential_SOURCE_DIR}/scripts/cmake/stub_generation.cmake)
 endif()
@@ -126,15 +118,9 @@ install(
 install(
     FILES
         LICENSE.md
-        doc/license/license_notes_from_aosd.txt
+        doc/license/LicenseNotes.md
     DESTINATION
         doc/license
-)
-install(
-    FILES
-        doc/changelog.md
-    DESTINATION
-        doc
 )
 
 if (fep3_system_cmake_enable_tests OR fep3_system_export_test_targets)

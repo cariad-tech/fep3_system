@@ -1,19 +1,13 @@
+# Copyright 2023 CARIAD SE. 
 #
-# Copyright @ 2021 VW Group. All rights reserved.
-#
-#     This Source Code Form is subject to the terms of the Mozilla
-#     Public License, v. 2.0. If a copy of the MPL was not distributed
-#     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# If it is not possible or desirable to put the notice in a particular file, then
-# You may include the notice in a location (such as a LICENSE file in a
-# relevant directory) where a recipient would be likely to look for such a notice.
-#
-# You may add additional accurate notices of copyright ownership.
+# This Source Code Form is subject to the terms of the Mozilla
+# Public License, v. 2.0. If a copy of the MPL was not distributed
+# with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import time, datetime
 import fep3_system, event_monitor, collections
 from threading import Event
+from pathlib import Path
 
 class TestMonitor(event_monitor.EventMonitor):
     def __init__(self, system, notification):
@@ -27,8 +21,8 @@ class TestMonitor(event_monitor.EventMonitor):
     def getMsg(self):
         return self._messages
 
-def test_system():
-    systems = fep3_system.discoverAllSystems(2, datetime.timedelta(seconds=10))
+def test_system_monitoring():
+    systems = fep3_system.discoverAllSystems(2, datetime.timedelta(seconds=60))
     notify = Event()
     monitor = TestMonitor(systems[0], notify)
     assert len(monitor.getMsg()) == 0           # expect an empty dictionary
@@ -52,3 +46,27 @@ def test_system():
 
     assert len(monitor.getMsg()) > 0            # expect entries in at least one key
     del monitor
+
+def test_system_csv_logging():
+    systems = fep3_system.discoverAllSystems(2, datetime.timedelta(seconds=60))
+    assert len(systems) == 1
+    assert systems[0].getSystemName().startswith("system_under_test") == True
+
+    log_file_path = Path(__file__).parent / "csv_log_file.txt"
+    csv_monitor = fep3_system.LoggingSinkCsv(log_file_path.absolute().as_posix())
+    systems[0].registerSystemMonitoring(csv_monitor)
+    systems[0].setSystemSeverityLevel(fep3_system.LoggerSeverity.debug)
+
+    systems[0].setSystemState(fep3_system.getSystemAggregatedStateFromString('loaded'))
+    state = systems[0].getSystemState()
+    assert fep3_system.systemAggregatedStateToString(state._state) == 'loaded'
+    assert state._homogeneous == True
+
+    systems[0].setSystemState(fep3_system.getSystemAggregatedStateFromString('unloaded'))
+    state = systems[0].getSystemState()
+    assert fep3_system.systemAggregatedStateToString(state._state) == 'unloaded'
+    assert state._homogeneous == True
+
+    systems[0].unregisterSystemMonitoring(csv_monitor)
+
+    assert log_file_path.is_file() == True

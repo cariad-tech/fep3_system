@@ -1,32 +1,17 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-#include "boost/asio.hpp"
-#include <boost/range/adaptors.hpp>
-#include <boost/range/algorithm.hpp>
+#include <boost/asio.hpp>
 #include <boost/algorithm/string/join.hpp>
 
 #include <boost/range.hpp>
 #include <fep_system/fep_system.h>
-#include <a_util/system/system.h>
 #include <service_bus_wrapper.h>
-#include "a_util/process.h"
 #include "system_logger.h"
 #include <map>
 #include <mutex>
@@ -40,6 +25,14 @@ You may add additional accurate notices of copyright ownership.
 
 #include "system_discovery_helper.h"
 #include "participant_health_aggregator.h"
+#include "fep_system_state_transition.h"
+
+#include "state_transition/fep_participant_proxy_state_transition.h"
+#include "fep_state_transition_controller.h"
+#include "rpc_services/participant_statemachine_proxy.hpp"
+#include "fep_system_state_transition_error_handling.h"
+#include "shutdown_helper.h"
+#include "base/service_bus_helper/include/participant_shutdown_listener.h"
 
 #include <fep3/components/clock/clock_service_intf.h>
 #include <fep3/components/clock_sync/clock_sync_service_intf.h>
@@ -53,152 +46,6 @@ using namespace a_util::strings;
 
 namespace
 {
-    struct ExecutionConfig
-    {
-        fep3::System::InitStartExecutionPolicy _policy = fep3::System::InitStartExecutionPolicy::parallel;
-        uint8_t _thread_count = 4;
-    };
-
-    std::vector<std::string> getParticipantNamesByState(
-        const fep3::ParticipantStates& participant_states,
-        fep3::rpc::arya::IRPCParticipantStateMachine::State state)
-    {
-        std::vector<std::string> participant_names;
-
-        for (const auto& participant_state : participant_states)
-        {
-            if (state == participant_state.second)
-            {
-                participant_names.emplace_back(participant_state.first);
-            }
-        }
-
-        return participant_names;
-    }
-
-    std::vector<fep3::ParticipantProxy> getParticipantsByState(const std::vector<fep3::ParticipantProxy>& source_participants,
-        const fep3::ParticipantStates& participant_states,
-        fep3::rpc::arya::IRPCParticipantStateMachine::State state)
-    {
-        const auto participant_names = getParticipantNamesByState(participant_states, state);
-
-        std::vector<fep3::ParticipantProxy> participants;
-
-        for (const auto& participant : source_participants)
-        {
-            if (std::find(participant_names.begin(), participant_names.end(), participant.getName()) != participant_names.end())
-            {
-                participants.emplace_back(participant);
-            }
-        }
-
-        return participants;
-    }
-
-    std::map<int32_t, std::vector<fep3::ParticipantProxy>> getParticipantsSortedbyStartPrio(
-        const std::vector<fep3::ParticipantProxy>& participants)
-    {
-        std::map<int32_t, std::vector<fep3::ParticipantProxy>> participants_sorted_by_prio;
-        for (const auto& part : participants)
-        {
-            auto prio = part.getStartPriority();
-            participants_sorted_by_prio[prio].push_back(part);
-        }
-        return participants_sorted_by_prio;
-    }
-
-    std::map<int32_t, std::vector<fep3::ParticipantProxy>> getParticipantsSortedbyInitPrio(
-    const std::vector<fep3::ParticipantProxy>& participants)
-    {
-        std::map<int32_t, std::vector<fep3::ParticipantProxy>> participants_sorted_by_prio;
-        for (const auto& part : participants)
-        {
-            auto prio = part.getInitPriority();
-            participants_sorted_by_prio[prio].push_back(part);
-        }
-        return participants_sorted_by_prio;
-    }
-
-    void for_each_ordered_reverse(std::map<int32_t, std::vector<fep3::ParticipantProxy>>& sorted_parts,
-            const ExecutionConfig& execution_config,
-            const std::function<void(fep3::ParticipantProxy&)>& call)
-    {
-        //reverse order of prio
-        for (auto current_prio = sorted_parts.rbegin();
-                current_prio != sorted_parts.rend();
-                ++current_prio)
-        {
-            //normal order of parts having the same prio(unfortunately this is by name at the moment)
-            auto& current_prio_parts = current_prio->second;
-
-            switch (execution_config._policy)
-            {
-                case  fep3::System::InitStartExecutionPolicy::sequential:
-                {
-                    for (auto& part_to_call : current_prio_parts)
-                    {
-                        call(part_to_call);
-                    }
-                    break;
-                }
-                case  fep3::System::InitStartExecutionPolicy::parallel:
-                {
-                    boost::asio::thread_pool pool(execution_config._thread_count);
-
-                    for (auto& part_to_call : current_prio_parts)
-                    {
-                        boost::asio::post(pool,
-                            [&]()
-                            {
-                                call(part_to_call);
-                            });
-                    }
-                    pool.join();
-                    break;
-                }
-            }
-        }
-    }
-
-    void for_each_ordered(std::map<int32_t, std::vector<fep3::ParticipantProxy>>& sorted_parts,
-        const std::function<void(fep3::ParticipantProxy&)>& call)
-    {
-        //normal order of prio
-        for (auto current_prio = sorted_parts.begin();
-            current_prio != sorted_parts.end();
-            ++current_prio)
-        {
-            //reverse order of parts having the same prio (unfortunatelly this is by name at the moment)
-            auto& current_prio_parts = current_prio->second;
-            for (auto part_to_call = current_prio_parts.rbegin();
-                    part_to_call != current_prio_parts.rend();
-                    ++part_to_call)
-            {
-                call(*part_to_call);
-            }
-        }
-    }
-
-    std::string toString(const fep3::rpc::ParticipantState& participant_state)
-    {
-        switch (participant_state)
-        {
-        case fep3::rpc::ParticipantState::unreachable:
-            return "unreachable";
-        case fep3::rpc::ParticipantState::unloaded:
-            return "unloaded";
-        case fep3::rpc::ParticipantState::loaded:
-            return "loaded";
-        case fep3::rpc::ParticipantState::initialized:
-            return "initialized";
-        case fep3::rpc::ParticipantState::running:
-            return "running";
-        case fep3::rpc::ParticipantState::paused:
-            return "paused";
-        default:
-            return "undefined";
-        }
-    }
 
     /**
      * @brief throws an exception if the given RPCClient does not wrap a valid RPC interface
@@ -207,10 +54,22 @@ namespace
      * @param rpc_client Checked for validitiy
      */
     template<typename RPCInterface>
-    void throwIfNotValid(fep3::RPCComponent<RPCInterface> rpc_client)
+    inline void throwIfNotValid(fep3::RPCComponent<RPCInterface> rpc_client, const fep3::SystemLogger* system_logger, const std::string& participant_name)
     {
         if (!rpc_client) {
-            throw std::runtime_error(format("Could not get RPC Client \"%s\" with RPC IID %s", RPCInterface::getRPCDefaultName(), RPCInterface::getRPCIID()));
+            FEP3_SYSTEM_LOG_AND_THROW(system_logger, fep3::arya::LoggerSeverity::fatal,
+                a_util::strings::format("Participant %s is unreachable - RPC communication to retrieve RPC service '%s' with '%s' failed", 
+                    participant_name.c_str(), RPCInterface::getRPCDefaultName(), RPCInterface::getRPCIID()));
+        }
+    }
+
+    void replaceAll(std::string& orignal, const std::string& to_be_replaced, const std::string& replacement)
+    {
+        auto next_occurence = orignal.find(to_be_replaced);
+        while (next_occurence != std::string::npos)
+        {
+            orignal.replace(next_occurence, to_be_replaced.length(), replacement);
+            next_occurence = orignal.find(to_be_replaced);
         }
     }
 }
@@ -223,6 +82,8 @@ namespace fep3
     struct System::Implementation
     {
     public:
+        using ParticipantProxyRange = std::vector<std::reference_wrapper<ParticipantProxy>>;
+
         explicit Implementation(const std::string& system_name)
             : Implementation(system_name, fep3::IServiceBus::ISystemAccess::_use_default_url)
         {
@@ -232,13 +93,16 @@ namespace fep3
 
         explicit Implementation(const std::string& system_name,
                                 const std::string& system_discovery_url)
-            : _system_name(system_name),
+            : _system_logger(std::make_shared<SystemLogger>(system_name)),
+              _system_name(system_name),
               _system_discovery_url(system_discovery_url),
-              _execution_config{},
-              _service_bus_wrapper(getServiceBusWrapper())
+              _service_bus_wrapper(getServiceBusWrapper()),
+              _execution_config{}
         {
             _service_bus_wrapper.createOrGetServiceBusConnection(system_name, system_discovery_url);
-            _logger->initRPCService(_system_name);
+            _participant_logger->initRPCService(_system_name, _system_logger);
+
+            initParticipantShutdownListener();
         }
 
         Implementation(const Implementation& other) = delete;
@@ -249,21 +113,91 @@ namespace fep3
         {
             _system_name = std::move(other._system_name);
             _system_discovery_url = std::move(other._system_discovery_url);
-            _participants = std::move(other._participants);
-            _logger = std::move(other._logger);
+            std::scoped_lock lock(other._participants._recursive_mutex, _participants._recursive_mutex);
+            _participants._proxies = std::move(other._participants._proxies);
+
+            _participant_logger = std::move(other._participant_logger);
+            _system_logger = std::move(other._system_logger);
             _service_bus_wrapper = other._service_bus_wrapper;
             return *this;
         }
 
         ~Implementation()
         {
+            if (auto system_access = _service_bus_wrapper.createOrGetServiceBusConnection(_system_name, _system_discovery_url)->getSystemAccessCatelyn(_system_name); system_access)
+            {
+                system_access->deregisterUpdateEventSink(_participant_shutdown_listener.get());
+            }
+            else {
+                FEP3_SYSTEM_LOG(_system_logger, LoggerSeverity::fatal,
+                    a_util::strings::format("Service bus returned nullptr when accessing system %s at %s. It is not possible to deregister event sink: 'participant shutdown listener'.", _system_name.c_str(), _system_discovery_url.c_str()));
+            }
             clear();
+        }
+
+        void participantShutdownNotification(const std::string& participant_name) {
+            
+            _system_logger->log(LoggerSeverity::debug, "Received byebye event from " + participant_name);
+
+            // participant is not reachable anymore. 
+            // Set participant proxy not reachable status flag to prevent further RPC calls in d'tor. 
+            std::scoped_lock lock(_participants._recursive_mutex);
+            (void)std::find_if(_participants._proxies.begin(), _participants._proxies.end(), [&participant_name](const ParticipantProxy& proxy) {
+                    if (proxy.getName() == participant_name) {
+                        proxy.setNotReachable();
+                        return true;
+                    }
+                    return false;
+                });
+            remove(participant_name);
+        }
+
+        void initParticipantShutdownListener()
+        {
+            _participant_shutdown_listener = std::make_unique<ParticipantShutdownListener>(
+                _system_name, 
+                [this](const std::string& participant_name)
+                {
+                    participantShutdownNotification(participant_name);
+                });
+
+            
+            auto system_access = _service_bus_wrapper.createOrGetServiceBusConnection(_system_name, _system_discovery_url)->getSystemAccessCatelyn(_system_name);
+
+            if (!system_access)
+            {
+                FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                    a_util::strings::format("No system connection to %s at %s possible", _system_name.c_str(), _system_discovery_url.c_str()));
+            }
+            else
+            {
+                system_access->registerUpdateEventSink(_participant_shutdown_listener.get());
+            }
+        }
+
+        ExecutionTimer getExecutionTimer(std::chrono::milliseconds timeout,
+                                         const StateInfo& state_info)
+        {
+            std::function<void()> warning_function = [&_system_logger = _system_logger,
+                                                      timeout,
+                                                      state_name = state_info.state_transition]() {
+                FEP3_SYSTEM_LOG(_system_logger,
+                                LoggerSeverity::warning,
+                                a_util::strings::format(
+                                    "Timeout of %lld ms exceeded for function call to state %s"
+                                    "... Cannot interrupt the function call.",
+                                    timeout.count(),
+                                    state_name.c_str()));
+            };
+
+            return ExecutionTimer{timeout, warning_function};
         }
 
         std::vector<std::string> mapToStringVec() const
         {
             std::vector<std::string> participants;
-            for (const auto& p : _participants)
+            std::scoped_lock lock(_participants._recursive_mutex);
+            for (const auto& p : _participants._proxies)
             {
                 participants.push_back(p.getName());
             }
@@ -272,425 +206,292 @@ namespace fep3
 
         std::vector<ParticipantProxy> mapToProxyVec() const
         {
-            return _participants;
+            std::scoped_lock lock(_participants._recursive_mutex);
+            return _participants._proxies;
         }
 
-        void reverse_state_change(std::chrono::milliseconds,
-            const std::string& logging_info,
-            bool init_false_start_true,
-            const std::function<void(RPCComponent<rpc::IRPCParticipantStateMachine>&)>& call_at_state,
-            std::vector<fep3::ParticipantProxy>& participants,
-            ExecutionConfig execution_config = ExecutionConfig())
+        template <typename PrioFunctionType, typename ExecPolicyType>
+        bool runStateTransition(
+            void (fep3::rpc::IRPCParticipantStateMachine::*transition_function)(),
+            StateInfo info,
+            SystemStateTransitionPrioSorting sorting,
+            PrioFunctionType prio_function,
+            ExecPolicyType&& policy,
+            ParticipantProxyRange& participants_to_transition)
         {
-            std::mutex mutex;
+            fep3::SystemStateTransition state_transition(
+                prio_function, sorting, ThrowOnErrorPolicy(), std::forward<ExecPolicyType>(policy));
 
-            if (participants.empty())
-            {
-                _logger->log(LoggerSeverity::warning, "",
-                    _system_name, "No participants within the current system");
-                return;
-            }
-            std::map<int32_t, std::vector<ParticipantProxy>> sorted_part;
-            if (!init_false_start_true)
-            {
-                sorted_part = getParticipantsSortedbyInitPrio(participants);
-            }
-            else
-            {
-                sorted_part = getParticipantsSortedbyStartPrio(participants);
-            }
-            for_each_ordered_reverse(sorted_part,
-                execution_config,
-                [&](ParticipantProxy& proxy)
-                {
-                    auto state_machine = proxy.getRPCComponentProxyByIID<rpc::IRPCParticipantStateMachine>();
-                    if (state_machine)
-                    {
-                        try
-                        {
-                            call_at_state(state_machine);
-                        }
-                        catch (const std::exception& ex)
-                        {
-                            const auto proxy_name = proxy.getName();
-                            {
-                                std::lock_guard<std::mutex> lock_guard(mutex);
-                                _last_transition_failed_participants.push_back(proxy_name);
-                            }
-                            _logger->log(LoggerSeverity::warning, "",
-                                _system_name, a_util::strings::format("Participant %s threw exception: '%s',"
-                                    "could not be %s successfully and remains in state '%s'.\n",
-                                proxy.getName().c_str(), ex.what(), logging_info.c_str(), toString(state_machine->getState()).c_str()));
-
-                        }
-                    }
-            });
-            if (!_last_transition_failed_participants.empty())
-            {
-                _logger->log(LoggerSeverity::info, "",
-                    _system_name, "System could not be " + logging_info + " in a homogeneous way. "
-                    "Failed participants wont be considered for further transitions.");
-            }
-            else {
-                _logger->log(LoggerSeverity::info, "",
-                    _system_name, "System " + logging_info + " successfully.");
-            }
+            return state_transition.execute(
+                participants_to_transition,
+                ProxyStateTransition(transition_function, _system_logger, info, _system_name),
+                info);
         }
 
-        void normal_state_change(std::chrono::milliseconds,
-            const std::string& logging_info,
-            bool init_false_start_true,
-            const std::function<void(RPCComponent<rpc::IRPCParticipantStateMachine>&)>& call_at_state,
-            std::vector<fep3::ParticipantProxy>& participants)
+        ParticipantProxyRange getParticipantProxyRange()
         {
-            if (_participants.empty())
-            {
-                _logger->log(LoggerSeverity::warning, "",
-                    _system_name, "No participants within the current system");
-                return;
+            ParticipantProxyRange range;
+            std::scoped_lock lock(_participants._recursive_mutex);
+            if (_participants._proxies.empty()) {
+                FEP3_SYSTEM_LOG(_system_logger,
+                                LoggerSeverity::warning,
+                                "No participants within the current system");
+                return range;
             }
-            std::map<int32_t, std::vector<ParticipantProxy>> sorted_part;
-            if (!init_false_start_true)
-            {
-                sorted_part = getParticipantsSortedbyInitPrio(participants);
-            }
-            else
-            {
-                sorted_part = getParticipantsSortedbyStartPrio(participants);
-            }
-            for_each_ordered(sorted_part,
-                [&](ParticipantProxy& proxy)
-                {
-                    auto state_machine = proxy.getRPCComponentProxyByIID<rpc::IRPCParticipantStateMachine>();
-                    if (state_machine)
-                    {
-                        try
-                        {
-                            call_at_state(state_machine);
-                        }
-                        catch (const std::exception& ex)
-                        {
-                            const auto proxy_name = proxy.getName();
-                            {
-                                _last_transition_failed_participants.push_back(proxy_name);
-                            }
-                            _logger->log(LoggerSeverity::warning, "",
-                                _system_name, a_util::strings::format("Participant %s threw exception: '%s',"
-                                    "could not be %s successfully and remains in state '%s'.\n",
-                                    proxy.getName().c_str(), ex.what(), logging_info.c_str(), toString(state_machine->getState()).c_str()));
 
-                        }
-                    }
-                });
-            if (!_last_transition_failed_participants.empty())
-            {
-                _logger->log(LoggerSeverity::info, "",
-                    _system_name, "System could not be " + logging_info + " in a homogeneous way. "
-                    "Failing participants wont be considered for further transitions.");
-            }
-            else {
-                _logger->log(LoggerSeverity::info, "",
-                    _system_name, "System " + logging_info + " successfully.");
-            }
+            std::transform(_participants._proxies.begin(),
+                           _participants._proxies.end(),
+                           std::back_insert_iterator(range),
+                           [](ParticipantProxy& proxy) { return std::ref(proxy); });
+
+            return range;
         }
 
-        void setSystemState(
-            System::AggregatedState state,
+        template <typename PrioFunctionType>
+        bool runStateTransition(
+            void (fep3::rpc::IRPCParticipantStateMachine::*transition_function)(),
+            StateInfo info,
+            SystemStateTransitionPrioSorting sorting,
+            PrioFunctionType prio_function,
+            std::optional<ParticipantProxyRange> participants_to_transition,
             std::chrono::milliseconds timeout)
         {
-            auto tmp_participants = _participants;
-            _last_transition_failed_participants.clear();
-            setSystemState(state, timeout, tmp_participants);
+            auto execution_timer = getExecutionTimer(timeout, info);
+            ParticipantProxyRange range;
+            if (participants_to_transition.has_value()) {
+                range = participants_to_transition.value();
+            }
+            else {
+                range = getParticipantProxyRange();
+            }
+
+            switch (_execution_config._policy) {
+            case fep3::System::InitStartExecutionPolicy::parallel:
+                return runStateTransition(transition_function,
+                                          info,
+                                          sorting,
+                                          prio_function,
+                                          ParallelExecutionPolicy{_execution_config._thread_count,
+                                                                  std::move(execution_timer)},
+                                          range);
+            case fep3::System::InitStartExecutionPolicy::sequential:
+                return runStateTransition(transition_function,
+                                          info,
+                                          sorting,
+                                          prio_function,
+                                          SerialExecutionPolicy{std::move(execution_timer)},
+                                          range);
+            }
+            return false;
         }
 
-        void decreaseSystemState(
-            System::State currentState,
-            const ParticipantStates& states,
-            const System::AggregatedState state,
-            const std::chrono::milliseconds timeout,
-            std::vector<ParticipantProxy>& participants)
+        void setSystemState(System::AggregatedState state,
+                            std::chrono::milliseconds timeout,
+                            ParticipantProxyRange& participant_proxy_range)
         {
-            if (currentState._state == System::AggregatedState::running)
-            {
-                if (state == System::AggregatedState::paused)
-                {
-                    currentState._homogeneous ? pause(timeout, participants) :
-                        pause(timeout, getParticipantsByState(participants, states, System::AggregatedState::running));
-                }
-                else
-                {
-                    currentState._homogeneous ? stop(timeout, participants) :
-                        stop(timeout, getParticipantsByState(participants, states, System::AggregatedState::running));
-                }
-            }
-            else if (currentState._state == System::AggregatedState::paused)
-            {
-                currentState._homogeneous ? stop(timeout, participants) :
-                    stop(timeout, getParticipantsByState(participants, states, System::AggregatedState::paused));
-            }
-            else if (currentState._state == System::AggregatedState::initialized)
-            {
-                currentState._homogeneous ? deinitialize(timeout, participants) :
-                    deinitialize(timeout, getParticipantsByState(participants, states, System::AggregatedState::initialized));
-            }
-            else if (currentState._state == System::AggregatedState::loaded)
-            {
-                currentState._homogeneous ? unload(timeout, participants) :
-                    unload(timeout, getParticipantsByState(participants, states, System::AggregatedState::loaded));
-            }
-        }
+            StateTransitionErrorHandling error_handling(_system_logger, getName());
 
-        void increaseSystemState(
-            const System::State currentState,
-            const ParticipantStates& states,
-            const System::AggregatedState state,
-            const std::chrono::milliseconds timeout,
-            std::vector<ParticipantProxy>& participants)
-        {
-            if (currentState._state == System::AggregatedState::unloaded)
-            {
-                currentState._homogeneous ? load(timeout, participants) :
-                    load(timeout, getParticipantsByState(participants, states, System::AggregatedState::unloaded));
-            }
-            else if (currentState._state == System::AggregatedState::loaded)
-            {
-                currentState._homogeneous ? initialize(timeout, participants) :
-                    initialize(timeout, getParticipantsByState(participants, states, System::AggregatedState::loaded));
-            }
-            else if (currentState._state == System::AggregatedState::initialized)
-            {
-                if (state == System::AggregatedState::paused)
-                {
-                    currentState._homogeneous ? pause(timeout, participants) :
-                        pause(timeout, getParticipantsByState(participants, states, System::AggregatedState::initialized));
+            error_handling.throwOnInvalidTargetState(state, toString(state));
+            using TransitionActionPointer = decltype(&System::Implementation::load);
+
+            static constexpr auto shutdown = &System::Implementation::shutdown;
+            static constexpr auto unload = &System::Implementation::unload;
+            static constexpr auto load = &System::Implementation::load;
+            static constexpr auto initialize = &System::Implementation::initialize;
+            static constexpr auto deinitialize = &System::Implementation::deinitialize;
+            static constexpr auto start = &System::Implementation::start;
+            static constexpr auto stop = &System::Implementation::stop;
+            static constexpr auto pause = &System::Implementation::pause;
+
+            static const std::vector<std::vector<TransitionActionPointer>> transition_matrix = {
+              //undefined unreachable     unloaded   loaded       initialized paused    running
+                {nullptr,   nullptr,     nullptr,  nullptr,       nullptr,    nullptr,  nullptr}, // undefined 0
+                {nullptr,   nullptr,     nullptr,  nullptr,       nullptr,    nullptr,  nullptr},   // unreachable 1
+                {nullptr,   shutdown,     nullptr, load,          nullptr,    nullptr,  nullptr},     // unloaded 2
+                {nullptr,   nullptr,     unload,   nullptr,       initialize, nullptr,  nullptr}, // loaded 3
+                {nullptr,   nullptr,     nullptr,  deinitialize,  nullptr,    pause,    start},  // initialized 4
+                {nullptr,   nullptr,     nullptr,  nullptr,       stop,       nullptr,  start},        // paused 5
+                {nullptr,   nullptr,     nullptr,  nullptr,       stop,       pause,    nullptr}};       // running 6
+
+            //object for logging an error in case of exception
+            TransitionSuccess transition_success{getName(), toString(state), _system_logger};
+            while (true) {
+                TransitionController transition_controller;
+                // we can save this assuming the participants changed their state
+                auto part_states_map = getParticipantStates(timeout, participant_proxy_range);
+                if (transition_controller.homogeneousTargetStateAchieved(part_states_map, state))
+                    break;
+                // check if we can perform a state transition with the current participants states
+                error_handling.checkParticipantsBeforeTransition(part_states_map);
+
+                // get the participant state in which the participants should be in order to
+                // participate in this transition.
+                System::AggregatedState state_to_transition_from =
+                    transition_controller.participantStateToTrigger(part_states_map, state);
+                // get the participants that we should perform a state transition on
+                std::vector<std::reference_wrapper<ParticipantProxy>> parts =
+                    transition_controller.getParticipantsInState(
+                        part_states_map, state_to_transition_from, participant_proxy_range);
+                // get the state in which the participants should transition
+                SystemAggregatedState state_to_transition_to =
+                    transition_controller.getNextParticipantsState(state_to_transition_from, state);
+                // we should never transition to the state we are at.
+                assert(state_to_transition_from != state);
+                // get the function that performs the actual transition
+                auto func = transition_matrix[state_to_transition_from][state_to_transition_to];
+                assert(func);
+                (this->*func)(timeout, parts);
+                FEP3_SYSTEM_LOG(_system_logger,
+                                LoggerSeverity::info,
+                                a_util::strings::format("System %s successfully.",
+                                                        toString(state_to_transition_to).c_str()));
+                // after shutdown there is nothing to do and the participant_proxy_range
+                // is invalid since some participants were thrown out
+                if (state_to_transition_to == fep3::System::AggregatedState::unreachable) {
+                    break;
                 }
-                else
-                {
-                    currentState._homogeneous ? start(timeout, participants) :
-                        start(timeout, getParticipantsByState(participants, states, System::AggregatedState::initialized));
-                }
             }
-            else if (currentState._state == System::AggregatedState::paused)
-            {
-                currentState._homogeneous ? start(timeout, participants) :
-                    start(timeout, getParticipantsByState(participants, states, System::AggregatedState::paused));
-            }
-        }
-
-        void setSystemState(
-            System::AggregatedState state,
-            std::chrono::milliseconds timeout,
-            std::vector<ParticipantProxy>& participants,
-            bool reversed = false)
-        {
-            for (const auto& failed_participant : _last_transition_failed_participants)
-            {
-                participants.erase(std::remove_if(participants.begin(), participants.end(),
-                    [&failed_participant](ParticipantProxy& participant_proxy) {
-                        return participant_proxy.getName() == failed_participant;
-                    }), participants.end());
-            }
-
-            if (System::AggregatedState::unreachable == state)
-            {
-                setSystemState(SystemAggregatedState::unloaded, timeout, participants, true);
-                shutdown(FEP_SYSTEM_TRANSITION_TIMEOUT);
-                return;
-            }
-
-            if (System::AggregatedState::undefined == state)
-            {
-                FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    LoggerSeverity::error,
-                    "",
-                    getName(),
-                    "Invalid setSystemState call at system " + getName());
-            }
-
-            auto states = getParticipantStates(timeout, participants);
-            auto currentState = reversed ? getAggregatedStateReversed(states) : getAggregatedState(states);
-            if (currentState._state == System::AggregatedState::unreachable)
-            {
-                FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    LoggerSeverity::error,
-                    "",
-                    getName(),
-                    "At least one participant is unreachable, can not set homogenous state of the system " + getName());
-            }
-            else if (currentState._state == System::AggregatedState::undefined)
-            {
-                FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    LoggerSeverity::error,
-                    "",
-                    getName(),
-                    "No participant has a statemachine, can not set homogenous state of the system " + getName());
-            }
-            else if (currentState._state == state)
-            {
-                if (currentState._homogeneous)
-                {
-                    return;
-                }
-                setSystemState(state, timeout, participants, true);
-                return;
-            }
-            else if (currentState._state > state)
-            {
-                decreaseSystemState(currentState, states, state, timeout, participants);
-                setSystemState(state, timeout, participants, true);
-                return;
-            }
-            else if (currentState._state < state)
-            {
-                increaseSystemState(currentState, states, state, timeout, participants);
-                setSystemState(state, timeout, participants);
-                return;
-            }
+            transition_success._success = true;
         }
 
         void load(std::chrono::milliseconds timeout,
-            std::vector<fep3::ParticipantProxy> participants_to_transition = {})
+                  std::optional<ParticipantProxyRange> participants_to_transition = std::nullopt)
         {
-            _last_transition_failed_participants.clear();
-            reverse_state_change(timeout, "loaded", false,
-            [&](RPCComponent<rpc::IRPCParticipantStateMachine>& state_machine)
-            {
-                if (state_machine)
-                {
-                    state_machine->load();
-                }
-            },
-                !participants_to_transition.empty() ? participants_to_transition : _participants);
+            runStateTransition(&fep3::rpc::IRPCParticipantStateMachine::load,
+                               {"loaded"},
+                               SystemStateTransitionPrioSorting::none,
+                               noPrio,
+                               participants_to_transition,
+                               timeout);
         }
 
         void unload(std::chrono::milliseconds timeout,
-            std::vector<fep3::ParticipantProxy> participants_to_transition = {})
+                    std::optional<ParticipantProxyRange> participants_to_transition = std::nullopt)
         {
-            _last_transition_failed_participants.clear();
-            normal_state_change(timeout, "unloaded", false,
-                [&](RPCComponent<rpc::IRPCParticipantStateMachine>& state_machine)
-            {
-                if (state_machine)
-                {
-                    state_machine->unload();
-                }
-            },
-                !participants_to_transition.empty() ? participants_to_transition : _participants);
+            runStateTransition(&fep3::rpc::IRPCParticipantStateMachine::unload,
+                               {"unloaded"},
+                               SystemStateTransitionPrioSorting::none,
+                               noPrio,
+                               participants_to_transition,
+                               timeout);
         }
 
-        void initialize(std::chrono::milliseconds timeout,
-            std::vector<fep3::ParticipantProxy> participants_to_transition = {})
+        void initialize(
+            std::chrono::milliseconds timeout,
+            std::optional<ParticipantProxyRange> participants_to_transition = std::nullopt)
         {
-            _last_transition_failed_participants.clear();
-            reverse_state_change(timeout, "initialized", false,
-                [&](RPCComponent<rpc::IRPCParticipantStateMachine>& state_machine)
-            {
-                if (state_machine)
-                {
-                    state_machine->initialize();
-                }
-            },
-                !participants_to_transition.empty() ? participants_to_transition : _participants,
-            _execution_config);
+            runStateTransition(
+                &fep3::rpc::IRPCParticipantStateMachine::initialize,
+                {"initialized"},
+                SystemStateTransitionPrioSorting::decreasing,
+                [](const ParticipantProxy& proxy) { return proxy.getInitPriority(); },
+                participants_to_transition,
+                timeout);
         }
 
-        void deinitialize(std::chrono::milliseconds timeout,
-            std::vector<fep3::ParticipantProxy> participants_to_transition = {})
+        void deinitialize(
+            std::chrono::milliseconds timeout,
+            std::optional<ParticipantProxyRange> participants_to_transition = std::nullopt)
         {
-            _last_transition_failed_participants.clear();
-            normal_state_change(timeout, "deinitialized", false,
-                [&](RPCComponent<rpc::IRPCParticipantStateMachine>& state_machine)
-            {
-                if (state_machine)
-                {
-                    state_machine->deinitialize();
-                }
-            },
-                !participants_to_transition.empty() ? participants_to_transition : _participants);
+            runStateTransition(
+                &fep3::rpc::IRPCParticipantStateMachine::deinitialize,
+                {"deinitialized"},
+                SystemStateTransitionPrioSorting::increasing,
+                [](const ParticipantProxy& proxy) { return proxy.getInitPriority(); },
+                participants_to_transition,
+                timeout);
         }
 
         void start(std::chrono::milliseconds timeout,
-            std::vector<fep3::ParticipantProxy> participants_to_transition = {})
+                   std::optional<ParticipantProxyRange> participants_to_transition = std::nullopt)
         {
-            _last_transition_failed_participants.clear();
-            reverse_state_change(timeout, "started", true,
-                [&](RPCComponent<rpc::IRPCParticipantStateMachine>& state_machine)
-            {
-                if (state_machine)
-                {
-                    state_machine->start();
-                }
-            },
-                !participants_to_transition.empty() ? participants_to_transition : _participants,
-            _execution_config);
+            runStateTransition(
+                &fep3::rpc::IRPCParticipantStateMachine::start,
+                {"started"},
+                SystemStateTransitionPrioSorting::decreasing,
+                [](const ParticipantProxy& proxy) { return proxy.getStartPriority(); },
+                participants_to_transition,
+                timeout);
         }
 
         void pause(std::chrono::milliseconds timeout,
-            std::vector<fep3::ParticipantProxy> participants_to_transition = {})
+                   std::optional<ParticipantProxyRange> participants_to_transition = std::nullopt)
         {
-            _last_transition_failed_participants.clear();
-            reverse_state_change(timeout, "paused", false,
-                [&](RPCComponent<rpc::IRPCParticipantStateMachine>& state_machine)
-            {
-                if (state_machine)
-                {
-                    state_machine->pause();
-                }
-            },
-                !participants_to_transition.empty() ? participants_to_transition : _participants);
+            runStateTransition(&fep3::rpc::IRPCParticipantStateMachine::pause,
+                               {"paused"},
+                               SystemStateTransitionPrioSorting::none,
+                               noPrio,
+                               participants_to_transition,
+                               timeout);
         }
         void stop(std::chrono::milliseconds timeout,
-            std::vector<fep3::ParticipantProxy> participants_to_transition = {})
+                  std::optional<ParticipantProxyRange> participants_to_transition = std::nullopt)
         {
-            _last_transition_failed_participants.clear();
-            normal_state_change(timeout, "stopped", false,
-                [&](RPCComponent<rpc::IRPCParticipantStateMachine>& state_machine)
-            {
-                if (state_machine)
-                {
-                    state_machine->stop();
-                }
-            },
-                !participants_to_transition.empty() ? participants_to_transition : _participants);
+            runStateTransition(
+                &fep3::rpc::IRPCParticipantStateMachine::stop,
+                {"stopped"},
+                SystemStateTransitionPrioSorting::increasing,
+                [](const ParticipantProxy& proxy) { return proxy.getStartPriority(); },
+                participants_to_transition,
+                timeout);
         }
 
-        void shutdown(std::chrono::milliseconds)
+        void shutdown(
+            std::chrono::milliseconds timeout,
+            std::optional<ParticipantProxyRange> participants_to_transition = std::nullopt)
         {
-            if (_participants.empty())
+            std::scoped_lock lock(_participants._recursive_mutex);
+            if (_participants._proxies.empty())
             {
-                _logger->log(LoggerSeverity::warning, "",
-                    _system_name + ".system", "No participants within the current system");
+                FEP3_SYSTEM_LOG(_system_logger, LoggerSeverity::warning, "No participants within the current system");
                 return;
             }
-            std::string error_message;
-            //shutdown has no prio
-            for (auto& part : _participants)
-            {
+
+            auto shutdown_function = [](std::reference_wrapper<ParticipantProxy>& proxy_ref) {
+                auto& part = proxy_ref.get();
+
+                 // very important to deregister any RPC communication before shutting down
+                // pending or communication after shutdown will wait for timeout
                 part.deregisterLogging();
-                auto state_machine = part.getRPCComponentProxyByIID<rpc::IRPCParticipantStateMachine>();
-                if (state_machine)
-                {
-                    try
-                    {
+                auto state_machine =
+                    part.getRPCComponentProxyByIID<rpc::IRPCParticipantStateMachine>();
+                if (state_machine) {
+                    try {
                         state_machine->shutdown();
                     }
-                    catch (const std::exception& ex)
-                    {
-                        error_message += std::string(" ") + ex.what();
+                    catch (const std::exception& ex) {
+                        return CREATE_ERROR_DESCRIPTION(
+                            ERR_FAILED,
+                            " Shut down participant %s threw an exception: %s;",
+                            part.getName().c_str(),
+                            ex.what());
+
                     }
                 }
-            }
-            if (!error_message.empty())
+                else {
+                    return CREATE_ERROR_DESCRIPTION(
+                        ERR_FAILED,
+                        " Participant %s is unreachable - RPC communication to retrieve RPC "
+                        "service with '%s' failed;",
+                        part.getName().c_str(),
+                        rpc::IRPCParticipantStateMachine::getRPCIID());
+                }
+
+                return fep3::Result{};
+            };
+
+            ParticipantProxyRange proxy_range;
+            if (participants_to_transition)
             {
-                FEP3_SYSTEM_LOG_AND_THROW(
-                    _logger,
-                    LoggerSeverity::fatal,
-                    "",
-                    _system_name,
-                    error_message);
+                proxy_range = participants_to_transition.value();
             }
-            _logger->log(LoggerSeverity::info, "",
-                _system_name, "system shut down successfully");
+            else {
+                proxy_range = getParticipantProxyRange();
+            }
+            auto timer = getExecutionTimer(timeout, {"unreachable"});
+            timer.start();
+            shutdownParticipants(_participants._proxies, proxy_range, shutdown_function, _system_logger);
+            timer.stop();
         }
 
         std::string getName()
@@ -706,15 +507,29 @@ namespace fep3
         //system state is aggregated
         //timeout can be only used if the RPC will
         // support the changing of it or use for every single Request
-        ParticipantStates getParticipantStates(std::chrono::milliseconds, const std::vector<ParticipantProxy>& participants)
+
+        ParticipantStates getParticipantStates(
+            std::chrono::milliseconds,
+            const ParticipantProxyRange& participants)
         {
             ParticipantStates states;
-            for (const auto& part : participants)
+            for (const auto& part_ref : participants)
             {
+                auto& part = part_ref.get();
                 RPCComponent<rpc::arya::IRPCParticipantInfo> part_info;
-                RPCComponent<rpc::arya::IRPCParticipantStateMachine> state_machine;
-                part_info = part.getRPCComponentProxyByIID<rpc::arya::IRPCParticipantInfo>();
-                state_machine = part.getRPCComponentProxyByIID<rpc::arya::IRPCParticipantStateMachine>();
+                RPCComponent<rpc::catelyn::IRPCParticipantStateMachine> state_machine;
+                try
+                {
+                    part_info = part.getRPCComponentProxyByIID<rpc::arya::IRPCParticipantInfo>();
+                    state_machine = part.getRPCComponentProxyByIID<rpc::catelyn::IRPCParticipantStateMachine>();
+                }
+                catch (std::exception& e)
+                {
+                    FEP3_SYSTEM_LOG(_system_logger, LoggerSeverity::warning,
+                        a_util::strings::format(" Participant %s is unreachable - RPC communication failed with exception: %s.", part.getName().c_str(), e.what()));
+                    states[part.getName()] = fep3::SystemAggregatedState::unreachable;
+                }
+
                 if (state_machine)
                 {
                     //the participant can not be connected ... maybe it was shutdown or whatever
@@ -725,13 +540,19 @@ namespace fep3
                     if (!part_info)
                     {
                         //the participant can not be connected ... maybe it was shutdown or whatever
-                        states[part.getName()] = { rpc::arya::IRPCParticipantStateMachine::State::unreachable };
+                        states[part.getName()] = { rpc::catelyn::IRPCParticipantStateMachine::State::unreachable };
+
+                        FEP3_SYSTEM_LOG(_system_logger, LoggerSeverity::warning,
+                            a_util::strings::format(" Participant %s is unreachable - RPC communication to retrieve RPC service with '%s' failed;", part.getName().c_str(), rpc::IRPCParticipantInfo::getRPCIID()));
                     }
                     else
                     {
                         //the participant has no state machine, this is ok
                         //... i.e. a recorder will have no states and a signal listener tool will have no states
-                        states[part.getName()] = { rpc::arya::IRPCParticipantStateMachine::State::unreachable };
+                        states[part.getName()] = { rpc::catelyn::IRPCParticipantStateMachine::State::unreachable };
+
+                        FEP3_SYSTEM_LOG(_system_logger, LoggerSeverity::warning,
+                            a_util::strings::format(" Participant %s is unreachable - RPC communication to retrieve RPC service with '%s' failed;", part.getName().c_str(), rpc::IRPCParticipantStateMachine::getRPCIID()));
                     }
                 }
             }
@@ -741,155 +562,100 @@ namespace fep3
         // Returns the lowest state and information whether all states are homogeneous.
         static System::State getAggregatedState(const ParticipantStates& states)
         {
-            //we begin at the highest value
-            SystemAggregatedState aggregated_state = SystemAggregatedState::running;
-            //we have a look if at least one of it is set
-            bool first_set = false;
-            bool homogeneous_value = true;
-            for (const auto& item : states)
-            {
-                rpc::arya::IRPCParticipantStateMachine::State current_part_state = item.second;
-                //we were at least one times in this loop
-                if (current_part_state != rpc::arya::IRPCParticipantStateMachine::State::undefined)
-                {
-                    if (current_part_state < aggregated_state)
-                    {
-                        if (first_set)
-                        {
-                            //is not homogenous because some of the already checked states has an higher value
-                            homogeneous_value = false;
-                        }
-                        aggregated_state = current_part_state;
-                    }
-                    if (current_part_state > aggregated_state)
-                    {
-                        //is not homogenous because some of the already checked states has an lower value
-                        homogeneous_value = false;
-                    }
-                    //this is to check if this loop was already entered before we change
-                    first_set = true;
-                }
-            }
-            //no participant has a statemachine, then we are also undefined
-            if (!first_set)
-            {
-                return { rpc::arya::IRPCParticipantStateMachine::State::undefined };
-            }
-            else
-            {
-                return { homogeneous_value , aggregated_state };
-            }
-        }
+            TransitionController transition_controller;
+            SystemAggregatedState aggregated_state =
+                transition_controller.getAggregatedState(states);
 
-        // Returns the highest state and information whether all states are homogeneous.
-        static System::State getAggregatedStateReversed(const ParticipantStates& states)
-        {
-            //we begin at the lowest value
-            SystemAggregatedState aggregated_state = SystemAggregatedState::unreachable;
-            //we have a look if at least one of it is set
-            bool first_set = false;
-            bool homogeneous_value = true;
-            for (const auto& item : states)
-            {
-                rpc::arya::IRPCParticipantStateMachine::State current_part_state = item.second;
-                //we were at least one times in this loop
-                if (current_part_state != rpc::arya::IRPCParticipantStateMachine::State::undefined)
-                {
-                    if (current_part_state > aggregated_state)
-                    {
-                        if (first_set)
-                        {
-                            //is not homogenous because some of the already checked states has an lower value
-                            homogeneous_value = false;
-                        }
-                        aggregated_state = current_part_state;
-                    }
-                    if (current_part_state < aggregated_state)
-                    {
-                        //is not homogenous because some of the already checked states has an higher value
-                        homogeneous_value = false;
-                    }
-                    //this is to check if this loop was already entered before we change
-                    first_set = true;
-                }
+            // no participant has a statemachine, then we are also unreachable
+            if (aggregated_state == rpc::catelyn::IRPCParticipantStateMachine::State::unreachable) {
+                return {rpc::catelyn::IRPCParticipantStateMachine::State::unreachable};
             }
-            //no participant has a statemachine, then we are also undefined
-            if (!first_set)
-            {
-                return { rpc::arya::IRPCParticipantStateMachine::State::undefined };
-            }
-            else
-            {
-                return { homogeneous_value , aggregated_state };
+            else {
+                return {
+                    transition_controller.homogeneousTargetStateAchieved(states, aggregated_state),
+                    aggregated_state};
             }
         }
 
         System::State getSystemState(std::chrono::milliseconds timeout)
         {
-            return getAggregatedState(getParticipantStates(timeout));
+            return getAggregatedState(getParticipantStates(timeout, getParticipantProxyRange()));
         }
 
         void registerMonitoring(IEventMonitor* monitor)
         {
             // register first in case a warning has to be logged
-            _logger->registerMonitor(monitor);
-
-            for (const auto& participant : _participants)
+            _participant_logger->registerMonitor(monitor);
+            std::scoped_lock lock(_participants._recursive_mutex);
+            for (const auto& participant : _participants._proxies)
             {
                 if (!participant.loggingRegistered())
                 {
-                    _logger->log(LoggerSeverity::warning, "",
-                    _system_name,
-                    a_util::strings::format("Participant %s has no registered logging interface.", participant.getName().c_str()));
+                    FEP3_SYSTEM_LOG(_system_logger, LoggerSeverity::warning,
+                        a_util::strings::format("Participant %s has no registered logging interface.", participant.getName().c_str()));
                 }
             }
         }
 
-        void releaseMonitoring()
+        void releaseMonitoring(IEventMonitor* monitor)
         {
-            _logger->releaseMonitor();
+            _participant_logger->releaseMonitor(monitor);
         }
 
         void setSeverityLevel(LoggerSeverity level)
         {
-            _logger->setSeverityLevel(level);
+            _participant_logger->setSeverityLevel(level);
+        }
+
+        void registerSystemMonitoring(IEventMonitor* monitor)
+        {
+            _system_logger->registerMonitor(monitor);
+        }
+
+        void releaseSystemMonitoring(IEventMonitor* monitor)
+        {
+            _system_logger->releaseMonitor(monitor);
+        }
+
+        void setSystemSeverityLevel(LoggerSeverity level)
+        {
+            _system_logger->setSeverityLevel(level);
         }
 
         void clear()
         {
-            _participants.clear();
+            std::scoped_lock lock(_participants._recursive_mutex);
+            _participants._proxies.clear();
         }
 
         void addAsync(const std::multimap<std::string, std::string>& participants, uint8_t pool_size)
         {
+            std::scoped_lock lock(_participants._recursive_mutex);
             // find if we have duplicates
             auto part_found = searchParticipant(participants, false);
             if (part_found)
             {
-                FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    LoggerSeverity::fatal,
-                    "",
-                    _system_name,
-                    "Try to add a participant with name "
-                    + part_found.getName() + " which already exists.");
+                FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                    a_util::strings::format("Try to add a participant with name %s which already exists.", part_found.getName().c_str()));
             }
 
             boost::asio::thread_pool pool(pool_size);
             //preallocate the vector
-            _participants = std::vector<ParticipantProxy>(participants.size());
+            _participants._proxies = std::vector<ParticipantProxy>(participants.size());
             uint32_t index = 0;
 
             for (auto& part_to_call : participants)
             {
                 boost::asio::post(pool,
-                    [&, index]()
+                    [this, index, part_to_call]()
                     {
                         // we can initialize safely in multi thread execution, each thread touches a different vector index
-                        _participants[index] = ParticipantProxy(part_to_call.first,
+                        _participants._proxies[index] = ParticipantProxy(part_to_call.first,
                             part_to_call.second,
                             _system_name,
                             _system_discovery_url,
-                            _logger,
+                            _participant_logger->getUrl(),
+                            _system_logger,
                             PARTICIPANT_DEFAULT_TIMEOUT);
                     });
                 ++index;
@@ -899,29 +665,29 @@ namespace fep3
 
         void add(const std::string& participant_name, const std::string& participant_url)
         {
-            auto part_found = getParticipant(participant_name, false);
-            if (part_found)
+            std::scoped_lock lock(_participants._recursive_mutex);
+            [[maybe_unused]] auto [_, participant] = getParticipant(participant_name);
+            (void)_;//gcc7 needs this
+            if (participant)
             {
-                FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    LoggerSeverity::fatal,
-                    "",
-                    _system_name,
-                    "Try to add a participant with name "
-                    + participant_name + " which already exists.");
+                FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                    a_util::strings::format("Try to add a participant with name %s which already exists.", participant_name.c_str()));
             }
-            _participants.push_back(ParticipantProxy(participant_name,
+            _participants._proxies.push_back(ParticipantProxy(participant_name,
                 participant_url,
                 _system_name,
                 _system_discovery_url,
-                _logger,
+                _participant_logger->getUrl(),
+                _system_logger,
                 PARTICIPANT_DEFAULT_TIMEOUT));
         }
 
         void remove(const std::string& participant_name)
         {
-            auto found = _participants.begin();
+            std::scoped_lock lock(_participants._recursive_mutex);
+            auto found = _participants._proxies.begin();
             for (;
-                found != _participants.end();
+                found != _participants._proxies.end();
                 ++found)
             {
                 if (found->getName() == participant_name)
@@ -929,39 +695,56 @@ namespace fep3
                     break;
                 }
             }
-            if (found != _participants.end())
+            if (found != _participants._proxies.end())
             {
-                _participants.erase(found);
+                _participants._proxies.erase(found);
             }
         }
 
         ParticipantProxy getParticipant(const std::string& participant_name, bool throw_if_not_found) const
         {
-            for (auto& part_found : _participants)
+            std::scoped_lock lock(_participants._recursive_mutex);
+            for (auto& part_found : _participants._proxies)
             {
                 if (part_found.getName() == participant_name)
                 {
                     return part_found;
                 }
             }
+            auto error_message = a_util::strings::format("No Participant with the name %s found", participant_name.c_str());
             if (throw_if_not_found)
             {
-                FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    LoggerSeverity::fatal,
-                    "",
-                    _system_name,
-                    "No Participant with the name " + participant_name + " found");
+                FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal, error_message);
+            }
+            else
+            {
+                FEP3_SYSTEM_LOG(_system_logger, LoggerSeverity::warning, error_message);
             }
             return {};
+        }
+
+        std::pair<fep3::Result, ParticipantProxy*> getParticipant(
+            const std::string& participant_name)
+        {
+            std::scoped_lock lock(_participants._recursive_mutex);
+            for (auto& part_found: _participants._proxies) {
+                if (part_found.getName() == participant_name) {
+                    return {fep3::Result{}, &part_found};
+                }
+            }
+            return {CREATE_ERROR_DESCRIPTION(fep3::ERR_NOT_FOUND,
+                                             "No Participant with the name %s found",
+                                             participant_name.c_str()),
+                    nullptr};
         }
 
         ParticipantProxy searchParticipant(const std::multimap<std::string, std::string>& participants, bool throw_if_not_found) const
         {
             auto particpant_names = boost::adaptors::keys(participants);
-
+            std::scoped_lock lock(_participants._recursive_mutex);
             auto part_found = std::search(
-                _participants.begin(),
-                _participants.end(),
+                _participants._proxies.begin(),
+                _participants._proxies.end(),
                 particpant_names.begin(),
                 particpant_names.end(),
                 [](const ParticipantProxy & part_proxy, const std::string & part_name)
@@ -969,15 +752,12 @@ namespace fep3
                     return part_proxy.getName() == part_name;
                 });
 
-            if (part_found == _participants.end())
+            if (part_found == _participants._proxies.end())
             {
                 if (throw_if_not_found)
                 {
-                    FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                        LoggerSeverity::fatal,
-                        "",
-                        _system_name,
-                        "No Participant with any of the names " + boost::algorithm::join(particpant_names, " ") + ", was found");
+                    FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                        a_util::strings::format("No Participant with any of the names %s, was found", boost::algorithm::join(particpant_names, " ").c_str())); 
                 }
                 else
                 {
@@ -1010,23 +790,18 @@ namespace fep3
                 // get properties of participant
                 using IRPCConfiguration = fep3::rpc::IRPCConfiguration;
                 auto config_rpc_client = part.getRPCComponentProxyByIID<IRPCConfiguration>();
-                throwIfNotValid<IRPCConfiguration>(config_rpc_client);
+                throwIfNotValid<IRPCConfiguration>(config_rpc_client, _system_logger.get(), participant_name);
 
                 auto props = config_rpc_client->getProperties(property_node);
                 if (!props) {
-                    throw std::runtime_error(format("access to properties node %s not possible", property_node.c_str()));
+                    FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                        a_util::strings::format("Participant %s within system %s cannot access property node %s for property %s", participant_name.c_str(), _system_name.c_str(), property_node.c_str(), property_name.c_str())); 
                 }
                 return std::make_pair(props, property_name);
             }
             else {
-                FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    LoggerSeverity::fatal,
-                    "",
-                    _system_name,
-                    format("participant %s within system %s not found to configure %s",
-                        participant_name.c_str(),
-                        _system_name.c_str(),
-                        property_path.c_str()));
+                FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                    a_util::strings::format("Participant %s within system %s not found to configure %s", participant_name.c_str(), _system_name.c_str(), property_path.c_str()));
             }
         }
 
@@ -1036,15 +811,16 @@ namespace fep3
             const bool throw_if_not_found) const
         {
             std::string property_path_normalized = property_path;
-            a_util::strings::replace(property_path_normalized, ".", "/");
+
+            replaceAll(property_path_normalized, ".", "/");
+
             ParticipantProxy part = getParticipant(participant_name, throw_if_not_found);
             auto [props, property_name] = getParticipantProperties(participant_name, property_path_normalized, part);
 
-            if (!props->setProperty(property_name, property_value, props->getPropertyType(property_name))) {
-                        const auto message = format("property %s could not be set for the following participant: %s"
-                    , property_path_normalized.c_str()
-                    , part.getName().c_str());
-                throw std::runtime_error(message);
+            if (!props->setProperty(property_name, property_value, props->getPropertyType(property_name))) 
+            {
+                FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                    a_util::strings::format("Property %s could not be set for the following participant: %s", property_path_normalized.c_str(), part.getName().c_str()));
             }
         }
 
@@ -1052,7 +828,7 @@ namespace fep3
                                            const std::string& property_path) const
         {
             std::string property_path_normalized = property_path;
-            a_util::strings::replace(property_path_normalized, ".", "/");
+            replaceAll(property_path_normalized, ".", "/");
             ParticipantProxy part = getParticipant(participant_name, true);
             auto [props, property_name] = getParticipantProperties(participant_name, property_path_normalized, part);
             return props->getProperty(property_name);
@@ -1060,33 +836,36 @@ namespace fep3
 
         SystemAggregatedState getParticipantState(const std::string& participant_name)
         {
-            ParticipantProxy participant(getParticipant(participant_name, true));
-            ParticipantStates states = getParticipantStates(std::chrono::milliseconds(0),
-                std::vector<ParticipantProxy>{participant});
-            return states.empty() ? SystemAggregatedState::undefined : states[participant.getName()];
+            ParticipantProxy participant(getParticipant(participant_name, false));
+            if (!participant)
+            {
+                return fep3::SystemAggregatedState::unreachable;
+            }
+            else
+            {
+                ParticipantStates states = getParticipantStates(std::chrono::milliseconds(0),
+                                                                ParticipantProxyRange{std::ref(participant)});
+                return states.empty() ? SystemAggregatedState::unreachable : states[participant.getName()];
+            }
         }
 
         ParticipantStates getParticipantStates(std::chrono::milliseconds timeout)
         {
-            return getParticipantStates(timeout, _participants);
+            return getParticipantStates(timeout, getParticipantProxyRange());
         }
 
         void setParticipantState(const std::string& participant_name, const SystemAggregatedState participant_state)
         {
-            auto part = getParticipant(participant_name, true);
-            if (part) {
-                // create a second temporary system with only one participant
-                fep3::System tmp_system(this->getName());
-                tmp_system.add(participant_name);
+            [[maybe_unused]] auto [res, participant_ptr] = getParticipant(participant_name);
 
-                if (participant_state == fep3::SystemAggregatedState::unreachable) {
-                    tmp_system.setSystemState(fep3::SystemAggregatedState::unloaded);
-                    tmp_system.shutdown();
-                    _participants.erase(std::find(begin(_participants), end(_participants), part));
-                }
-                else {
-                    tmp_system.setSystemState(participant_state);
-                }
+            if (res) {
+                ParticipantProxy& participant = *participant_ptr;
+                ParticipantProxyRange participant_as_range{std::reference_wrapper(participant)};
+                setSystemState(participant_state,
+                               FEP_SYSTEM_TRANSITION_TIMEOUT, participant_as_range);
+            }
+            else {
+                throw std::runtime_error(res.getDescription());
             }
         }
 
@@ -1098,7 +877,7 @@ namespace fep3
             const bool throw_on_failure = true) const
         {
             std::string property_normalized = property_name;
-            a_util::strings::replace(property_normalized, ".", "/");
+            replaceAll(property_normalized, ".", "/");
             auto failing_participants = std::vector<std::string>();
 
             for (const ParticipantProxy& participant : getParticipants())
@@ -1115,7 +894,7 @@ namespace fep3
                 {
                     using IRPCConfiguration = fep3::rpc::IRPCConfiguration;
                     auto config_rpc_client = participant.getRPCComponentProxyByIID<IRPCConfiguration>();
-                    throwIfNotValid<IRPCConfiguration>(config_rpc_client);
+                    throwIfNotValid<IRPCConfiguration>(config_rpc_client, _system_logger.get(), participant.getName());
 
                     auto props = config_rpc_client->getProperties(node);
                     if (props)
@@ -1135,21 +914,17 @@ namespace fep3
 
             if (!failing_participants.empty())
             {
-                const auto participants = join(failing_participants, ", ");
-                const auto message = format("property %s could not be set for the following participants: %s"
-                    , property_normalized.c_str()
-                    , participants.c_str());
+                const auto participants = a_util::strings::join(failing_participants, ", ");
+                const auto message = "Property " + property_normalized + " could not be set for the following participants: " + participants;
 
                 if (throw_on_failure)
                 {
-                    throw std::runtime_error(message);
+                    FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal, message);
                 }
-
-                FEP3_SYSTEM_LOG(_logger,
-                    LoggerSeverity::warning,
-                    "",
-                    _system_name,
-                    message);
+                else 
+                {
+                    FEP3_SYSTEM_LOG(_system_logger, LoggerSeverity::warning, message);
+                }
             }
         }
 
@@ -1205,7 +980,7 @@ namespace fep3
             {
                 using IRPCConfiguration = fep3::rpc::IRPCConfiguration;
                 auto config_rpc_client = participant.getRPCComponentProxyByIID<IRPCConfiguration>();
-                throwIfNotValid<IRPCConfiguration>(config_rpc_client);
+                throwIfNotValid<IRPCConfiguration>(config_rpc_client, _system_logger.get(), participant.getName());
 
                 auto props = config_rpc_client->getProperties(FEP3_CLOCKSYNC_SERVICE_CONFIG);
                 if (props)
@@ -1237,8 +1012,8 @@ namespace fep3
                     std::unique_ptr<IProperties>(new base::Properties<IProperties>()));
                 if (!iterator_success.second)
                 {
-                    FEP3_SYSTEM_LOG_AND_THROW(_logger, LoggerSeverity::fatal, "", _system_name,
-                        "Multiple Participants with the name " + participant.getName() + " found");
+                    FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                        a_util::strings::format("Multiple Participants with the name %s found", participant.getName().c_str())); 
                 }
                 IProperties& participant_properties = *iterator_success.first->second;
                 auto set_if_present = [&participant_properties](const fep3::arya::IProperties& properties, const std::string& config_name) {
@@ -1252,7 +1027,7 @@ namespace fep3
 
                 using IRPCConfiguration = fep3::rpc::IRPCConfiguration;
                 auto config_rpc_client = participant.getRPCComponentProxyByIID<IRPCConfiguration>();
-                throwIfNotValid<IRPCConfiguration>(config_rpc_client);
+                throwIfNotValid<IRPCConfiguration>(config_rpc_client, _system_logger.get(), participant.getName());
 
                 auto clockservice_props = config_rpc_client->getProperties(FEP3_CLOCK_SERVICE_CONFIG);
                 if (clockservice_props)
@@ -1291,7 +1066,8 @@ namespace fep3
             }
             else
             {
-                throw std::runtime_error("thread count with value 0 is not valid");
+                FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                    "Thread count with value 0 is not valid");
             }
         }
 
@@ -1305,28 +1081,16 @@ namespace fep3
             auto part = getParticipant(participant, false);
             if (part)
             {
-
                 auto http_server_rpc = part.getRPCComponentProxyByIID<fep3::rpc::IRPCHttpServer>();
-                try 
-                {
-                    throwIfNotValid<fep3::rpc::IRPCHttpServer>(http_server_rpc);
-                    auto interval = http_server_rpc->getHeartbeatInterval();
-                    return interval;
-                }
-                catch (const std::exception& ex)
-                {
-                    FEP3_SYSTEM_LOG_AND_THROW(_logger, LoggerSeverity::fatal, "", _system_name, ex.what());
-                }
+
+                throwIfNotValid<fep3::rpc::IRPCHttpServer>(http_server_rpc, _system_logger.get(), participant);
+                auto interval = http_server_rpc->getHeartbeatInterval();
+                return interval;
             }
             else
             {
-                FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    LoggerSeverity::fatal,
-                    "",
-                    _system_name,
-                    format("participant %s within system %s not found%s",
-                        participant.c_str(),
-                        _system_name.c_str()));
+                FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                    a_util::strings::format("Participant %s within system %s not found", participant.c_str(), _system_name.c_str()));
             }
         }
 
@@ -1336,25 +1100,14 @@ namespace fep3
             if (part)
             {
                 auto http_server_rpc = part.getRPCComponentProxyByIID<fep3::rpc::IRPCHttpServer>();
-                try
-                {
-                    throwIfNotValid<fep3::rpc::IRPCHttpServer>(http_server_rpc);
-                    http_server_rpc->setHeartbeatInterval(interval_ms);
-                }
-                catch (const std::exception& ex)
-                {
-                    FEP3_SYSTEM_LOG_AND_THROW(_logger, LoggerSeverity::fatal, "", _system_name, ex.what());
-                }
+
+                throwIfNotValid<fep3::rpc::IRPCHttpServer>(http_server_rpc, _system_logger.get(), participant);
+                http_server_rpc->setHeartbeatInterval(interval_ms);
             }
             else
             {
-                FEP3_SYSTEM_LOG_AND_THROW(_logger,
-                    LoggerSeverity::fatal,
-                    "",
-                    _system_name,
-                    format("participant %s within system %s not found%s",
-                        participant.c_str(),
-                        _system_name.c_str()));
+                FEP3_SYSTEM_LOG_AND_THROW(_system_logger, LoggerSeverity::fatal,
+                    a_util::strings::format("Participant %s within system %s not found", participant.c_str(), _system_name.c_str()));
             }
         }
 
@@ -1377,7 +1130,8 @@ namespace fep3
         std::map<std::string, ParticipantHealth> getParticipantsHealth()
         {
             ParticipantHealthStateAggregator health_state_aggregator(_liveliness_timeout);
-            for (auto& participant : _participants)
+            std::scoped_lock lock(_participants._recursive_mutex);
+            for (const auto& participant : _participants._proxies)
             {
                 health_state_aggregator.setParticipantHealth(participant.getName(), std::move(participant.getParticipantHealth()));
             }
@@ -1397,7 +1151,8 @@ namespace fep3
 
         void setHealthListenerRunningStatus(bool running)
         {
-            for (auto& participant : _participants)
+            std::scoped_lock lock(_participants._recursive_mutex);
+            for (auto& participant : _participants._proxies)
             {
                 participant.setHealthListenerRunningStatus(running);
             }
@@ -1405,9 +1160,10 @@ namespace fep3
 
         std::pair<bool, bool> getHealthListenerRunningStatus() const
         {
-            std::vector<bool> participant_health_listener_running(_participants.size());
+            std::scoped_lock lock(_participants._recursive_mutex);
+            std::vector<bool> participant_health_listener_running(_participants._proxies.size());
 
-            std::transform(_participants.begin(), _participants.end(), participant_health_listener_running.begin(), [](const auto& participant) {return participant.getHealthListenerRunningStatus(); });
+            std::transform(_participants._proxies.begin(), _participants._proxies.end(), participant_health_listener_running.begin(), [](const auto& participant) {return participant.getHealthListenerRunningStatus(); });
 
             int sum = std::accumulate(std::begin(participant_health_listener_running), std::end(participant_health_listener_running), 0);
 
@@ -1425,14 +1181,20 @@ namespace fep3
             }
         }
 
-        std::vector<ParticipantProxy> _participants;
-        std::vector<std::string> _last_transition_failed_participants;
-        std::shared_ptr<SystemLogger> _logger = std::make_shared<SystemLogger>();
+        struct ParticipantProxies {
+            // lock to protect list of proxies against access from service bus thread and api calls
+            mutable std::recursive_mutex _recursive_mutex;
+            std::vector<ParticipantProxy> _proxies;
+        };
+        ParticipantProxies _participants;
+        std::shared_ptr<SystemLogger> _system_logger;
+        std::shared_ptr<RemoteLogForwarder> _participant_logger = std::make_shared<RemoteLogForwarder>();
         std::string _system_name;
         std::string _system_discovery_url;
         ServiceBusWrapper _service_bus_wrapper;
-        ::ExecutionConfig _execution_config;
+        ExecutionConfig _execution_config;
         fep3::Timestamp _liveliness_timeout = std::chrono::nanoseconds(std::chrono::seconds(20));
+        std::unique_ptr<ParticipantShutdownListener> _participant_shutdown_listener;
     };
 
     System::System() : _impl(new Implementation(""))
@@ -1441,6 +1203,7 @@ namespace fep3
 
     System::System(const std::string& system_name) : _impl(new Implementation(system_name))
     {
+
     }
 
     System::System(const std::string& system_name,
@@ -1463,7 +1226,7 @@ namespace fep3
 
     System& System::operator=(const System& other)
     {
-        _impl->_system_name = getSystemName();
+        _impl = std::make_unique<Implementation>(other.getSystemName(), other.getSystemUrl());
         auto proxies = other.getParticipants();
         for (const auto& proxy : proxies)
         {
@@ -1491,7 +1254,8 @@ namespace fep3
 
     void System::setSystemState(System::AggregatedState state, std::chrono::milliseconds timeout) const
     {
-        _impl->setSystemState(state, timeout);
+        auto participants = _impl->getParticipantProxyRange();
+        _impl->setSystemState(state, timeout, participants);
     }
 
     void System::load(std::chrono::milliseconds timeout /*= FEP_SYSTEM_TRANSITION_TIME*/) const
@@ -1634,19 +1398,34 @@ namespace fep3
         _impl->setParticipantState(participant_name, participant_state);
     }
 
-    void System::registerMonitoring(IEventMonitor& pEventListener)
+    void System::registerMonitoring(IEventMonitor& event_monitor)
     {
-        _impl->registerMonitoring(&pEventListener);
+        _impl->registerMonitoring(&event_monitor);
     }
 
-    void System::unregisterMonitoring(IEventMonitor&)
+    void System::unregisterMonitoring(IEventMonitor& event_monitor)
     {
-        _impl->releaseMonitoring();
+        _impl->releaseMonitoring(&event_monitor);
     }
 
     void System::setSeverityLevel(LoggerSeverity severity_level)
     {
         _impl->setSeverityLevel(severity_level);
+    }
+
+    void System::registerSystemMonitoring(IEventMonitor& event_monitor)
+    {
+        _impl->registerSystemMonitoring(&event_monitor);
+    }
+
+    void System::unregisterSystemMonitoring(IEventMonitor& event_monitor)
+    {
+        _impl->releaseSystemMonitoring(&event_monitor);
+    }
+
+    void System::setSystemSeverityLevel(LoggerSeverity severity_level)
+    {
+        _impl->setSystemSeverityLevel(severity_level);
     }
 
     void System::configureTiming(const std::string& master_clock_name, const std::string& slave_clock_name,
@@ -1764,14 +1543,15 @@ namespace fep3
             //we check if that system access exists ... the service bus connection must create it for me
             auto sys_access = my_discovery_bus->getSystemAccessCatelyn(name);
             if (!sys_access)
-            {
+            { 
                 throw std::runtime_error("can not find a system access on service bus connection to system '"
-                    + name + "' at url '" + discover_url);
+                    + name + "' at url '" + discover_url + "'; " + std::to_string(__LINE__) + ", " + std::string(__FILE__) + ", " + std::string(A_UTIL_CURRENT_FUNCTION));
             }
            // auto participants = sys_access->discover(timeout);
             auto [error, participants_optional] = discoverSystemParticipants(*sys_access, std::forward<Args>(args)...);
             if (!participants_optional.has_value())
             {
+                error.append("; " + std::to_string(__LINE__) + ", " + std::string(__FILE__) + ", " + std::string(A_UTIL_CURRENT_FUNCTION));
                 throw std::runtime_error(error);
             }
             std::multimap<std::string, std::string> participants = participants_optional.value();
@@ -1781,7 +1561,7 @@ namespace fep3
             return discovered_system;
         }
         throw std::runtime_error("can not create a service bus connection to system '"
-            + name + "' at url '" + discover_url + "'");
+            + name + "' at url '" + discover_url + "'; " + std::to_string(__LINE__) + ", " + std::string(__FILE__) + ", " + std::string(A_UTIL_CURRENT_FUNCTION));
     }
 
 
@@ -1842,12 +1622,13 @@ namespace fep3
             if (!sys_access)
             {
                 throw std::runtime_error("can not create a system access on service bus connection to discover all systems at url '"
-                    + discover_url);
+                    + discover_url + "'; " + std::to_string(__LINE__) + ", " + std::string(__FILE__) + ", " + std::string(A_UTIL_CURRENT_FUNCTION));
             }
             // auto all_participants = sys_access->discover(timeout);
             auto [error, participants_optional] = discoverSystemParticipants(*sys_access, std::forward<Args>(args)...);
             if (!participants_optional.has_value())
             {
+                error.append("; " + std::to_string(__LINE__) + ", " + std::string(__FILE__) + ", " + std::string(A_UTIL_CURRENT_FUNCTION));
                 throw std::runtime_error(error);
             }
             std::multimap<std::string, std::string> all_participants = participants_optional.value();
@@ -1869,12 +1650,8 @@ namespace fep3
                 }
                 else
                 {
-
-                    const std::string error_mesage = a_util::strings::format(
-                        "Parsing error while discoverAllSystems by URL %s .Expected a string like participant_name@system_name but got %s ",
-                        discover_url.c_str(),
-                        part.first.c_str());
-                    throw std::runtime_error(error_mesage);
+                    throw std::runtime_error("Parsing error while discoverAllSystems by URL " + discover_url + " .Expected a string like participant_name@system_name but got " + part.first +
+                        "; " + std::to_string(__LINE__) + ", " + std::string(__FILE__) + ", " + std::string(A_UTIL_CURRENT_FUNCTION));
                 }
             }
 
@@ -1914,7 +1691,7 @@ namespace fep3
             return result_vector_system;
         }
         throw std::runtime_error("can not create a service bus connection to discover all systems at url ''"
-            + discover_url + "'");
+            + discover_url + "'; " + std::to_string(__LINE__) + ", " + std::string(__FILE__) + ", " + std::string(A_UTIL_CURRENT_FUNCTION));
     }
 
     std::vector<System> discoverAllSystems(std::chrono::milliseconds timeout /*= FEP_SYSTEM_DISCOVER_TIMEOUT*/)
@@ -1971,7 +1748,7 @@ namespace fep3
         {
             return it->second;
         }
-        return fep3::SystemAggregatedState::undefined;
+        return fep3::SystemAggregatedState::unreachable;
     }
 
     std::string systemAggregatedStateToString(const fep3::System::AggregatedState state)

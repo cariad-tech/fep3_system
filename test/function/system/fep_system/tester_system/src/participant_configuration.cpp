@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
@@ -38,6 +27,7 @@ You may add additional accurate notices of copyright ownership.
 #include <fep3/base/properties/propertynode_helper.h>
 #include <fep_system/mock_event_monitor.h>
 #include <gtest_asserts.h>
+#include <fep3/components/service_bus/service_bus_intf.h>
 
 
 using EventMonitorMock = testing::NiceMock<fep3::mock::EventMonitor>;
@@ -299,5 +289,78 @@ TEST(cTesterParticipantConfiguration, TestProxyConfigPropNotExistsNoCreate)
     prop_opt = base::getPropertyValue<std::string>(*config_service, "test_does_not_exists");
     //check if it does not exists
     ASSERT_FALSE(prop_opt);
+}
+
+/**
+ * @brief Test getter and setter for start priority and init priority
+ * @req_id FEPSDK-3602
+ */
+TEST(cTesterParticipantConfiguration, TestProxyConfigPrioritySetterAndGetter)
+{
+    using namespace fep3;
+    const std::string system_name = makePlatformDepName("system1");
+
+    const std::string participant_name = "Participant1_configuration_test";
+
+    auto parts = createTestParticipants({ participant_name }, system_name);
+    fep3::System system1 = fep3::discoverSystem(system_name, { participant_name }, 4000ms);
+    ParticipantProxy p1 = system1.getParticipant(participant_name);
+    ASSERT_EQ(p1.getStartPriority(), 0);
+    p1.setStartPriority(10);
+    ASSERT_EQ(p1.getStartPriority(), 10);
+
+    ASSERT_EQ(p1.getInitPriority(), 0);
+    p1.setInitPriority(20);
+    ASSERT_EQ(p1.getInitPriority(), 20);
+
+    fep3::System system2 = fep3::discoverSystem(system_name, { participant_name }, 4000ms);
+    ParticipantProxy p2 = system2.getParticipant(participant_name);
+
+    ASSERT_EQ(p2.getStartPriority(), 10);
+    ASSERT_EQ(p2.getInitPriority(), 20);
+}
+
+/**
+ * @brief Test getter and setter for start priority and init priority in old version
+ * @req_id FEPSDK-3602
+ */
+TEST(cTesterParticipantConfiguration, TestProxyConfigPriorityCompability)
+{
+    using namespace fep3;
+    const std::string system_name = makePlatformDepName("Blackbox");
+    const std::string participant_name = "Participant1_configuration_test";
+
+    // Remove the properties for priority, as the old version of participant do not have them
+    auto parts = createTestParticipants({ participant_name }, system_name);
+    auto& part = parts[participant_name];
+    auto config_service = part->_part.getComponent<IConfigurationService>();
+    config_service->unregisterNode(FEP3_SERVICE_BUS_CONFIG);
+
+    // Make sure the property does not exist 
+    fep3::System system1 = fep3::discoverSystem(system_name, { participant_name }, 4000ms);
+    ParticipantProxy p1 = system1.getParticipant(participant_name);
+    auto config = p1.getRPCComponentProxyByIID<fep3::rpc::IRPCConfiguration>();
+    ASSERT_TRUE(static_cast<bool>(config));
+
+    auto props = config->getProperties("/");
+    auto retval = props->getProperty(FEP3_SERVICE_BUS_CONFIG);
+    ASSERT_EQ(retval, std::string());
+
+    // Test the compability
+
+    ASSERT_EQ(p1.getInitPriority(), 0);
+    p1.setInitPriority(10);
+    ASSERT_EQ(p1.getInitPriority(), 10);
+
+    ASSERT_EQ(p1.getStartPriority(), 0);
+    p1.setStartPriority(20);
+    ASSERT_EQ(p1.getStartPriority(), 20);
+
+    // Test the old behavior: the priority is local
+    fep3::System system2 = fep3::discoverSystem(system_name, { participant_name }, 4000ms);
+    ParticipantProxy p2 = system2.getParticipant(participant_name);
+
+    ASSERT_EQ(p2.getInitPriority(), 0);
+    ASSERT_EQ(p2.getStartPriority(), 0);
 }
 

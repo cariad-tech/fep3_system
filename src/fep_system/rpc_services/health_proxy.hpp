@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
@@ -23,12 +12,12 @@ You may add additional accurate notices of copyright ownership.
 
 #include "health_service_proxy_stub.h"
 #include "rpc_services/health/health_service_rpc_intf.h"
+#include "rpc_services/base/fep_rpc_json_to_result.h"
 
 #include <components/service_bus/rpc/fep_rpc_stubs_client.h>
 #include <fep3/components/service_bus/rpc/fep_rpc.h>
 #include <string>
 #include <cassert>
-#include <a_util/strings.h>
 
 namespace fep3::rpc::catelyn
 {
@@ -100,7 +89,7 @@ public:
     {
         try
         {
-            return ::rpc::cJSONConversions::json_to_result(GetStub().resetHealth());
+            return fep3::rpc::arya::jsonToResult(GetStub().resetHealth());
         }
         catch (const std::exception& exception)
         {

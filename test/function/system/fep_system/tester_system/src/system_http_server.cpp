@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2022 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
@@ -105,9 +94,22 @@ TEST_F(SystemHealthTest, TestParticipantsSetHeartbeatIntervalAll)
     _system.setHeartbeatInterval({_participant_name_1}, 50ms);
     ASSERT_EQ(_system.getHeartbeatInterval(_participant_name_1), 50ms);
     ASSERT_EQ(_system.getHeartbeatInterval(_participant_name_2), 100ms);
+}
+
+/**
+ * @brief Test whether the system library throws an exception when sets the heartbeat interval on destroyed server
+ */
+TEST_F(SystemHealthTest, TestParticipantsSetHeartbeatIntervalOnDestroyedServer)
+{
+    // set heartbeat for all participants
+    _system.setHeartbeatInterval({}, 100ms);
 
     // destroy the server
     _participants[_participant_name_1].reset();
-    ASSERT_THROW(_system.setHeartbeatInterval({}, 100ms), std::runtime_error);
-}
 
+    // thrown exception depends on
+    // a) the byebye notification was received and participant proxy is removed from list --> participant not found exception
+    // b) the byebye notification is delayed the participant proxy is still available --> participant rpc call exception
+
+    ASSERT_THROW(_system.setHeartbeatInterval({ _participant_name_1, _participant_name_2 }, 100ms), std::runtime_error); // getParticipant from list --> not found --> logAndThrow
+}

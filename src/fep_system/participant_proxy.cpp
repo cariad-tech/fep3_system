@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
@@ -32,14 +21,16 @@ ParticipantProxy::ParticipantProxy(const std::string& participant_name,
     const std::string& participant_url,
     const std::string& system_name,
     const std::string& system_discovery_url,
-    std::shared_ptr<ISystemLogger> logger,
+    const std::string& rpc_server_url,
+    std::shared_ptr<ISystemLogger> system_logger,
     std::chrono::milliseconds default_timeout)
 {
     _impl.reset(new Implementation(participant_name,
                                    participant_url,
                                    system_name,
                                    system_discovery_url,
-                                   logger,
+                                   rpc_server_url,
+                                   system_logger,
                                    default_timeout));
 }
 ParticipantProxy::ParticipantProxy(ParticipantProxy&& other)
@@ -148,6 +139,11 @@ void ParticipantProxy::setHealthListenerRunningStatus(bool running)
 bool ParticipantProxy::getHealthListenerRunningStatus() const
 {
     return _impl->getHealthListenerRunningStatus();
+}
+
+void ParticipantProxy::setNotReachable() const
+{
+    _impl->setNotReachable();
 }
 
 }

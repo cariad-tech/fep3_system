@@ -2,32 +2,25 @@
  * @file
  * @copyright
  * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
+Copyright 2023 CARIAD SE. 
 
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
+This Source Code Form is subject to the terms of the Mozilla
+Public License, v. 2.0. If a copy of the MPL was not distributed
+with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 @endverbatim
  */
 
 
 #pragma once
-
 #include "base/logging/logging_types.h"
 #include <string>
 #include <chrono>
 
+
 namespace fep3
 {
     /**
-     * @brief The system logger is an internal interfaces used within the ParticipantProxy
+     * @brief The system logger is an internal interface used within the ParticipantProxy
      * It is the connection to the IEventMonitor set within the fep3::System class.
      * Each logging message within the ParticipantProxy which is part of a fep3::System will be forwarded to this
      * interface.
@@ -44,76 +37,68 @@ namespace fep3
         public:
             /**
              * @brief logs a log message to the system logger.
-             *
-             * @param[in] timestamp time value
-             * @param[in] level Level
-             * @param[in] participant_name The name of the participant
-             * @param[in] logger_name the name of the logger
-             * @param[in] message the message that will be forwarded
-             */
-            virtual void log(const std::chrono::milliseconds& timestamp,
-                             LoggerSeverity level,
-                             const std::string& participant_name,
-                             const std::string& logger_name, //depends on the Category ...
-                             const std::string& message) const = 0;
-            /**
-             * @brief logs a log message to the system logger.
              * time value is taken from now
              *
-             * @param[in] level Level
-             * @param[in] participant_name The name of the participant
-             * @param[in] logger_name the name of the logger
+             * @param[in] severity logger severity
              * @param[in] message the message that will be forwarded
              */
             virtual void log(
-                LoggerSeverity level,
-                const std::string& participant_name,
-                const std::string& logger_name, //depends on the Category ...
+                LoggerSeverity severity,
                 const std::string& message) const = 0;
 
             /**
-             * @brief gets a valid url for registering the system instance to the participants logging service.
+             * @brief logs a proxy error message.
+             * time value is taken from now
              *
-             * @return returns a valid url for registering the system instance to the participants logging service.
+             * @param[in] severity logger severity
+             * @param[in] participant_name the name of the participant
+             * @param[in] component the component creating the message
+             * @param[in] message the message that will be forwarded
              */
-            virtual std::string getUrl() const = 0;
+            virtual void logProxyError(
+                LoggerSeverity severity,
+                const std::string& participant_name,
+                const std::string& component,
+                const std::string& message) const = 0;
+
+    };
+
+    /**
+     * @brief The participant logger is an internal interface used to forward the logs coming
+     * from remote rpc participants.
+     *
+     */
+    class IRemoteLogForwarder {
+    protected:
+        /**
+         * @brief default DTOR
+         *
+         */
+        virtual ~IRemoteLogForwarder() = default;
+
+    public:
+        /**
+         * @brief logs a log message to the system logger.
+         *
+         * @param[in] timestamp time value
+         * @param[in] level Level
+         * @param[in] participant_name The name of the participant
+         * @param[in] logger_name the name of the logger
+         * @param[in] message the message that will be forwarded
+         */
+        virtual void log(const std::chrono::milliseconds& timestamp,
+                         LoggerSeverity level,
+                         const std::string& participant_name,
+                         const std::string& logger_name, // depends on the Category ...
+                         const std::string& message) const = 0;
+
+        /**
+         * @brief gets a valid url for registering the system instance to the participants logging
+         * service.
+         *
+         * @return returns a valid url for registering the system instance to the participants
+         * logging service.
+         */
+        virtual std::string getUrl() const = 0;
     };
 }
-
-/**
- * @brief Helper macro to log a message to a system logger
- * @param[in] given_logger logger pointer
- * @param[in] given_sev Level
- * @param[in] given_part_name The name of the participant
- * @param[in] given_logger_name the name of the logger
- * @param[in] log_message the message that will be forwarded
- */
-#define FEP3_SYSTEM_LOG(given_logger, given_sev, given_part_name, given_logger_name, log_message) \
-do \
-{ \
-    given_logger->log(\
-        given_sev, \
-        given_part_name, \
-        given_logger_name, \
-        std::string() + log_message); \
-} while (false)
-
-/**
- * @brief Helper macro to log to a system logger a mesage and throw a runtime_error
- * @param[in] given_logger logger pointer
- * @param[in] given_sev Level
- * @param[in] given_part_name The name of the participant
- * @param[in] given_logger_name the name of the logger
- * @param[in] log_message the message that will be forwarded
- */
-#define FEP3_SYSTEM_LOG_AND_THROW(given_logger, given_sev, given_part_name, given_logger_name, log_message) \
-do \
-{ \
-    std::string log_message_string = std::string() + log_message; \
-    given_logger->log(\
-        given_sev, \
-        given_part_name, \
-        given_logger_name, \
-        log_message_string); \
-        throw std::runtime_error(log_message_string); \
-} while (false)

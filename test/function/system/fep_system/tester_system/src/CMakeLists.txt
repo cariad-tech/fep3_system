@@ -1,15 +1,8 @@
+# Copyright 2023 CARIAD SE. 
 #
-# Copyright @ 2021 VW Group. All rights reserved.
-#
-#     This Source Code Form is subject to the terms of the Mozilla
-#     Public License, v. 2.0. If a copy of the MPL was not distributed
-#     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# If it is not possible or desirable to put the notice in a particular file, then
-# You may include the notice in a location (such as a LICENSE file in a
-# relevant directory) where a recipient would be likely to look for such a notice.
-#
-# You may add additional accurate notices of copyright ownership.
+# This Source Code Form is subject to the terms of the Mozilla
+# Public License, v. 2.0. If a copy of the MPL was not distributed
+# with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 #
 
@@ -22,7 +15,7 @@ set_target_properties(fep_participant_file_copy_tester_system PROPERTIES FOLDER 
 # tester_system_discovery
 ##################################################################
 find_package(dev_essential REQUIRED COMPONENTS xml process)
-find_package(Boost REQUIRED COMPONENTS filesystem)
+find_package(Boost REQUIRED COMPONENTS filesystem thread)
 
 add_executable(tester_system_discovery system_discovery.cpp)
 target_link_libraries(tester_system_discovery
@@ -38,11 +31,13 @@ target_link_libraries(tester_system_discovery
 
 add_dependencies(tester_system_discovery fep_system_file_copy_tester_system fep_participant_file_copy_tester_system)
 set_target_PROPERTIES(tester_system_discovery PROPERTIES FOLDER test/fep_system)
-add_test(NAME tester_system_discovery_dds
-         COMMAND tester_system_discovery --plugin dds_service_discovery
+gtest_discover_tests(tester_system_discovery
+         TEST_SUFFIX _dds
+         EXTRA_ARGS --plugin dds_service_discovery
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
-add_test(NAME tester_system_discovery_http
-         COMMAND tester_system_discovery --plugin http_service_discovery
+gtest_discover_tests(tester_system_discovery
+         TEST_SUFFIX _http
+         EXTRA_ARGS --plugin http_service_discovery
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
 set_target_properties(tester_system_discovery PROPERTIES INSTALL_RPATH "$ORIGIN")
 target_include_directories(tester_system_discovery PRIVATE $<TARGET_FILE_DIR:tester_system_discovery>/include/)
@@ -88,17 +83,15 @@ target_link_libraries(${_current_test_name} PRIVATE
     fep3_system
     fep3_participant_core
     system_test_utils
-    dev_essential::process
-    dev_essential::system
     Boost::headers
+    Boost::thread
     )
 add_dependencies(${_current_test_name} fep_system_file_copy_tester_system fep_participant_file_copy_tester_system)
 set_target_PROPERTIES(${_current_test_name} PROPERTIES FOLDER test/fep_system)
 # all the tests have a common working dir, so the header is generated for tester_system_discovery
 target_include_directories(tester_system PRIVATE $<TARGET_FILE_DIR:tester_system_discovery>/include/)
 
-add_test(NAME ${_current_test_name}
-         COMMAND ${_current_test_name}
+gtest_discover_tests(${_current_test_name}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
 
 set_target_properties(${_current_test_name} PROPERTIES INSTALL_RPATH "$ORIGIN")
@@ -165,15 +158,14 @@ set(_current_test_name tester_system_library_participant)
 add_executable(${_current_test_name} participant.cpp)
 target_link_libraries(${_current_test_name} PRIVATE
     GTest::gtest_main
+    GTest::gmock
     fep3_system
     fep3_participant_core
     system_test_utils
-    dev_essential::process
 )
 add_dependencies(${_current_test_name} fep_system_file_copy_tester_system fep_participant_file_copy_tester_system)
 set_target_PROPERTIES(${_current_test_name} PROPERTIES FOLDER test/fep_system)
-add_test(NAME ${_current_test_name}
-         COMMAND ${_current_test_name}
+gtest_discover_tests(${_current_test_name}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
 
 set_target_properties(${_current_test_name} PROPERTIES INSTALL_RPATH "$ORIGIN")
@@ -191,12 +183,10 @@ target_link_libraries(${_current_test_name} PRIVATE
     fep3_participant_core
     system_test_utils
     fep3_system_test
-    dev_essential::process
 )
 add_dependencies(${_current_test_name} fep_system_file_copy_tester_system fep_participant_file_copy_tester_system)
 set_target_PROPERTIES(${_current_test_name} PROPERTIES FOLDER test/fep_system)
-add_test(NAME ${_current_test_name}
-         COMMAND ${_current_test_name}
+gtest_discover_tests(${_current_test_name}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
 set_target_properties(${_current_test_name} PROPERTIES INSTALL_RPATH "$ORIGIN")
 
@@ -206,19 +196,28 @@ set_target_properties(${_current_test_name} PROPERTIES INSTALL_RPATH "$ORIGIN")
 
 set(_current_test_name tester_system_library_logging)
 add_executable(${_current_test_name} system_logging.cpp)
+find_package(Boost 1.73.0 REQUIRED COMPONENTS date_time filesystem)
 target_link_libraries(${_current_test_name} PRIVATE
     GTest::gtest_main
+    GTest::gmock_main
     fep3_system
     fep3_participant_core
     system_test_utils
-    dev_essential::process
+    Boost::date_time
+    Boost::filesystem
+    fep3_system_test
 )
 add_dependencies(${_current_test_name} fep_system_file_copy_tester_system fep_participant_file_copy_tester_system)
 set_target_PROPERTIES(${_current_test_name} PROPERTIES FOLDER test/fep_system)
-add_test(NAME ${_current_test_name}
-         COMMAND ${_current_test_name}
+get_filename_component(test_log_files_dir "./../files"
+                       REALPATH  BASE_DIR ${CMAKE_CURRENT_BINARY_DIR})
+target_compile_definitions(${_current_test_name}
+            PRIVATE TEST_LOGFILES_DIR="${test_log_files_dir}"
+        )
+gtest_discover_tests(${_current_test_name}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
 set_target_properties(${_current_test_name} PROPERTIES INSTALL_RPATH "$ORIGIN")
+set_target_properties(${_current_test_name} PROPERTIES TIMEOUT 120)
 
 ##################################################################
 # tester_system_library_data_registry
@@ -232,12 +231,10 @@ target_link_libraries(${_current_test_name} PRIVATE
     fep3_participant_core
     system_test_utils
     fep3_system_test
-    dev_essential::process
 )
 add_dependencies(${_current_test_name} fep_system_file_copy_tester_system fep_participant_file_copy_tester_system)
 set_target_PROPERTIES(${_current_test_name} PROPERTIES FOLDER test/fep_system)
-add_test(NAME ${_current_test_name}
-     COMMAND ${_current_test_name}
+gtest_discover_tests(${_current_test_name}
      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
 set_target_properties(${_current_test_name} PROPERTIES INSTALL_RPATH "$ORIGIN")
 
@@ -254,12 +251,10 @@ target_link_libraries(${_current_test_name} PRIVATE
     fep3_participant_cpp
     fep3_participant_core
     system_test_utils
-    dev_essential::process
 )
 add_dependencies(${_current_test_name} fep_system_file_copy_tester_system fep_participant_file_copy_tester_system)
 set_target_PROPERTIES(${_current_test_name} PROPERTIES FOLDER test/fep_system)
-add_test(NAME ${_current_test_name}
-         COMMAND ${_current_test_name}
+gtest_discover_tests(${_current_test_name}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
 
 get_filename_component(PARENT_DIR ../ ABSOLUTE)
@@ -274,6 +269,26 @@ file(GENERATE OUTPUT  ${PARENT_DIR}/files/fep3_participant_$<CONFIG>.fep_compone
 set_target_properties(${_current_test_name} PROPERTIES INSTALL_RPATH "$ORIGIN")
 
 ##################################################################
+# tester_system_library_service_bus
+##################################################################
+
+set(_current_test_name tester_system_library_service_bus)
+add_executable(${_current_test_name} system_service_bus.cpp)
+target_link_libraries(${_current_test_name} PRIVATE
+    GTest::gtest_main
+    fep3_system
+    fep3_participant_cpp
+    fep3_participant_core
+    system_test_utils
+    dev_essential::process
+)
+add_dependencies(${_current_test_name} fep_system_file_copy_tester_system fep_participant_file_copy_tester_system)
+set_target_PROPERTIES(${_current_test_name} PROPERTIES FOLDER test/fep_system)
+gtest_discover_tests(${_current_test_name}
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
+set_target_properties(${_current_test_name} PROPERTIES INSTALL_RPATH "$ORIGIN")
+
+##################################################################
 # tester_system_library_http_server
 ##################################################################
 
@@ -284,12 +299,10 @@ target_link_libraries(${_current_test_name} PRIVATE
     fep3_system
     fep3_participant_core
     system_test_utils
-    dev_essential::process
 )
 add_dependencies(${_current_test_name} fep_system_file_copy_tester_system fep_participant_file_copy_tester_system)
 set_target_PROPERTIES(${_current_test_name} PROPERTIES FOLDER test/fep_system)
-add_test(NAME ${_current_test_name}
-         COMMAND ${_current_test_name}
+gtest_discover_tests(${_current_test_name}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
 set_target_properties(${_current_test_name} PROPERTIES INSTALL_RPATH "$ORIGIN")
 
@@ -305,12 +318,10 @@ target_link_libraries(${_current_test_name} PRIVATE
     fep3_participant_core
     system_test_utils
     fep3_system_test
-    dev_essential::process
 )
 add_dependencies(${_current_test_name} fep_system_file_copy_tester_system fep_participant_file_copy_tester_system)
 set_target_PROPERTIES(${_current_test_name} PROPERTIES FOLDER test/fep_system)
-add_test(NAME ${_current_test_name}
-         COMMAND ${_current_test_name}
+gtest_discover_tests(${_current_test_name}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../)
  target_compile_definitions(${_current_test_name} PRIVATE
      TEST_BUILD_DIR="${PARENT_DIR}/files/fep3_participant_$<CONFIG>.fep_components"

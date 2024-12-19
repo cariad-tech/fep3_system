@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 #if defined(_MSC_VER)
@@ -27,6 +16,7 @@ You may add additional accurate notices of copyright ownership.
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <fep_system/logging_sink_csv.h>
 
 namespace fep3
 {
@@ -184,6 +174,9 @@ PYBIND11_MODULE(fep3_system, m) {
     py::class_<IEventMonitor, PyEventMonitor>(m, "IEventMonitor")                   // for register- and unregisterMonitoring
         .def(py::init<>())
         .def("onLog", &IEventMonitor::onLog);
+    py::class_<LoggingSinkCsv, IEventMonitor>(m, "LoggingSinkCsv")                  // for system csv logging
+        .def(py::init<const std::string &>())
+        .def("onLog", &IEventMonitor::onLog);
 
     // class System and its member functions
     py::class_<System> (m, "System")
@@ -217,6 +210,14 @@ PYBIND11_MODULE(fep3_system, m) {
         py::arg("event_listener"), py::call_guard<py::gil_scoped_release>())
     .def("unregisterMonitoring", &System::unregisterMonitoring,
         py::arg("event_listener"), py::call_guard<py::gil_scoped_release>())
+    .def("setSeverityLevel", &System::setSeverityLevel,
+        py::arg("severity_level"), py::call_guard<py::gil_scoped_release>())
+    .def("registerSystemMonitoring", &System::registerSystemMonitoring,
+        py::arg("event_listener"), py::call_guard<py::gil_scoped_release>())
+    .def("unregisterSystemMonitoring", &System::unregisterSystemMonitoring,
+        py::arg("event_listener"), py::call_guard<py::gil_scoped_release>())
+    .def("setSystemSeverityLevel", &System::setSystemSeverityLevel,
+        py::arg("severity_level"), py::call_guard<py::gil_scoped_release>())
     .def("configureTiming3ClockSyncOnlyInterpolation", &System::configureTiming3ClockSyncOnlyInterpolation,
         py::arg("master_element_id"), py::arg("slave_sync_cycle_time_ms"), py::call_guard<py::gil_scoped_release>())
     .def("configureTiming3DiscreteSteps", &System::configureTiming3DiscreteSteps,

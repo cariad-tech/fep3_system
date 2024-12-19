@@ -2,18 +2,11 @@
  * @file
  * @copyright
  * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
+Copyright 2023 CARIAD SE. 
 
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
+This Source Code Form is subject to the terms of the Mozilla
+Public License, v. 2.0. If a copy of the MPL was not distributed
+with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 @endverbatim
  */
 
@@ -22,6 +15,7 @@ You may add additional accurate notices of copyright ownership.
 #include <string>
 #include "base/logging/logging_types.h"
 #include "logging_types_legacy.h"
+#include "rpc_services/participant_statemachine/participant_statemachine_rpc_intf.h"
 
 namespace fep3
 {
@@ -40,13 +34,13 @@ public:
      *
      * @param[in] log_time time of the log
      * @param[in] severity_level severity level of the log
-     * @param[in] participant_name participant name (is empty on system category)
-     * @param[in] logger_name (usually the system, participant, component or element name and category)
+     * @param[in] system_name_or_participant_name name of the logging participant or system
+     * @param[in] logger_name name of the logging logger (usually the participant, component or element name and category, "system_logger" for system logs)
      * @param[in] message detailed message
      */
     virtual void onLog(std::chrono::milliseconds log_time,
         LoggerSeverity severity_level,
-        const std::string& participant_name,
+        const std::string& system_name_or_participant_name,
         const std::string& logger_name, //depends on the Category ...
         const std::string& message) = 0;
 };
@@ -108,12 +102,12 @@ public:
      */
     void onLog(std::chrono::milliseconds log_time,
         LoggerSeverity severity_level,
-        const std::string& participant_name,
+        const std::string& system_name_or_participant_name,
         const std::string& logger_name, //depends on the Category ...
         const std::string& message) override
     {
         legacy::Category category = legacy::Category::CATEGORY_NONE;
-        if (participant_name.empty())
+        if (system_name_or_participant_name.empty())
         {
             category = legacy::Category::CATEGORY_SYSTEM;
         }
@@ -132,7 +126,12 @@ public:
                 category = legacy::Category::CATEGORY_PARTICIPANT;
             }
         }
-        onLog(log_time, category, severity_level, participant_name, logger_name, message);
+        onLog(log_time,
+              category,
+              severity_level,
+              system_name_or_participant_name,
+              logger_name,
+              message);
     }
 };
 }

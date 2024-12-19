@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
@@ -32,10 +21,12 @@ You may add additional accurate notices of copyright ownership.
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <a_util/system.h>
 #include <fep_system/fep_system.h>
 #include <string.h>
 #include <fep_test_common.h>
+#include <include/fep_system/mock_event_monitor.h>
+#include <chrono>
+#include <thread>
 
 using namespace fep3;
 
@@ -81,7 +72,7 @@ public:
         auto single_wait = timeout_ms / 10;
         while (!_done && i < 10)
         {
-            a_util::system::sleepMilliseconds(static_cast<uint32_t>(single_wait));
+            std::this_thread::sleep_for(std::chrono::milliseconds(single_wait));
             ++i;
         }
         if (_done)
@@ -191,77 +182,48 @@ TEST_F(SystemLibrarySingleParticipant, TestParticpantInfo)
                                        rpc::getRPCDefaultName<fep3::rpc::IRPCParticipantStateMachine>()}));
 }
 
-/*
-TEST(SystemLibrary, TestDataRegistry)
-{
-    System systm("Blackbox");
-    cTestBaseModule mod;
-    ASSERT_EQ(a_util::result::SUCCESS, mod.Create("Participant1"));
-    // register some random signals
-    mod.GetSignalRegistry()->RegisterSignalDescription("files/timing_example.description");
-    handle_t some_handle;
-    mod.GetSignalRegistry()->RegisterSignal(fep::cUserSignalOptions("tFEP_Examples_ObjectState", SD_Output), some_handle);
-    // trigger participant into state FS_READY
-    mod.GetStateMachine()->InitializeEvent();
-    // verify signals are given out by DRProxy
-    systm.add(mod.GetName());
-    auto p1 = systm.getParticipant(mod.GetName());
-    auto dr = p1.getRPCComponentProxy<fep::rpc::IRPCDataRegistry>();
-
-    ASSERT_STREQ(dr->getRPCDefaultName(), "data_registry");
-    ASSERT_STREQ(dr->getRPCIID(), "data_registry.iid");
-    std::vector<std::string> ref_vec{ "tFEP_Examples_ObjectState" };
-    ASSERT_TRUE(dr->getSignalsOut() == ref_vec);
-    ASSERT_TRUE(dr->getSignalsIn().empty());
-    ASSERT_STREQ(dr->getStreamType("tFEP_Examples_ObjectState").getMetaTypeName(), "ddl");
-}*/
-
 TEST(SystemLibrary, TestProxiesNOK)
 {
     using namespace fep3;
-    System systm(makePlatformDepName("Blackbox"));
+    System system(makePlatformDepName("Blackbox"));
 
     TestEventMonitor tem;
-    systm.registerMonitoring(tem);
-    systm.add("does_not_exist");
+    system.registerSystemMonitoring(tem);
+    system.add("does_not_exist");
 
-    auto p1 = systm.getParticipant("does_not_exist");
+    auto p1 = system.getParticipant("does_not_exist");
     bool caught = false;
     try
     {
         p1.getRPCComponentProxyByIID<rpc::IRPCParticipantStateMachine>();
     }
-    catch (std::runtime_error e)
+    catch (std::runtime_error)
     {
-        std::string msg = e.what();
         caught = true;
-        ASSERT_STREQ("Participant does_not_exist is unreachable", e.what());
     }
 
     ASSERT_TRUE(caught);
     tem.waitForDone(3000);
 
-    ASSERT_EQ(tem._severity_level, LoggerSeverity::fatal);
-    ASSERT_EQ(tem._participant_name, "does_not_exist");
-    ASSERT_EQ(tem._logger_name, systm.getSystemName());
+    ASSERT_EQ(tem._severity_level, LoggerSeverity::warning);
     ASSERT_TRUE(tem._message.find("Participant does_not_exist is unreachable") != std::string::npos);
     {
-        systm.clear();
+        system.clear();
         TestParticipants participants;
         std::string participant1_name = "Participant_for_test";
         ASSERT_NO_THROW(
-            participants = createTestParticipants({ participant1_name }, systm.getSystemName());
+            participants = createTestParticipants({ participant1_name }, system.getSystemName());
         );
 
         ASSERT_NO_THROW(
-            systm.add(participant1_name);
+            system.add(participant1_name);
         );
 
-        p1 = systm.getParticipant(participant1_name);
+        p1 = system.getParticipant(participant1_name);
         auto sm = p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>();
     }
 
-    systm.unregisterMonitoring(tem);
+    system.unregisterSystemMonitoring(tem);
 }
 
 /**
@@ -310,7 +272,7 @@ TEST(SystemLibrary, SetSystemStateToUndefined)
     system.add(participant_name);
 
     ASSERT_THROW_MESSAGE_HAS_SUBSTR(system.setSystemState(fep3::SystemAggregatedState::undefined),
-        std::runtime_error, "Invalid setSystemState call at system " + system.getSystemName());
+        std::runtime_error, "Call setSystemState at system " + system.getSystemName() + " with invalid value for argument 'state'");
 }
 
 /**
@@ -324,13 +286,70 @@ TEST(SystemLibrary, SetParticipantStateToUnreachable)
     auto participants = createTestParticipants(participant_name, system.getSystemName());
     system.add(participant_name);
 
-    ASSERT_NO_THROW(system.setParticipantState(participant_name[0], fep3::SystemAggregatedState::unreachable));
-    ASSERT_THROW_MESSAGE_HAS_SUBSTR(system.getParticipantState(participant_name[0]), std::runtime_error,
-        "No Participant with the name " + participant_name[0] + " found");
+    using EventMonitorMock = ::testing::NiceMock<fep3::mock::EventMonitor>;
+    using namespace testing;
 
+    EventMonitorMock event_monitor;
+
+    system.registerSystemMonitoring(event_monitor);
+
+    EXPECT_CALL(event_monitor, onLog(_, Le(fep3::LoggerSeverity::warning), _, _, _)).Times(0);
+    EXPECT_CALL(event_monitor, onLog(_, Gt(fep3::LoggerSeverity::warning), _, _, _)).Times(AnyNumber());
+    ASSERT_NO_THROW(
+        system.setParticipantState(participant_name[1], fep3::SystemAggregatedState::unreachable));
+
+    EXPECT_THAT(system.getSystemState(),
+                AllOf(Field(&fep3::SystemState::_homogeneous, true),
+                      Field(&fep3::SystemState::_state, fep3::SystemAggregatedState::unloaded)));
+
+    ASSERT_NO_THROW(
+        system.setParticipantState(participant_name[0], fep3::SystemAggregatedState::unreachable));
+    // after this point we are not interested in checking any warnings/errors
+    system.unregisterSystemMonitoring(event_monitor);
+
+    ASSERT_EQ(system.getParticipantState(participant_name[1]),
+              fep3::SystemAggregatedState::unreachable);
+    ASSERT_EQ(system.getParticipantState(participant_name[0]),
+              fep3::SystemAggregatedState::unreachable);
+
+    System system_without_participants_removed(makePlatformDepName("test_system"));
+    system_without_participants_removed.add(participant_name);
+    ASSERT_EQ(system_without_participants_removed.getParticipantState(participant_name[0]), fep3::SystemAggregatedState::unreachable);
+
+    System system_copy(system_without_participants_removed);
+    system_copy.add("non_existing_participant");
+    ASSERT_EQ(system_copy.getParticipantState("non_existing_participant"), fep3::SystemAggregatedState::unreachable);
 }
 
 /**
+ * @brief Test whether System controllable after shutting down a single participant
+ *
+ */
+
+TEST(SystemLibrary, SystemControllableAfterShuttingDownParticipant)
+{
+    System system(makePlatformDepName("test_system"));
+
+    const std::vector<std::string> participant_names = {
+        "test_participant_1", "test_participant_2", "test_participant_3"};
+    auto participants = createTestParticipants(participant_names, system.getSystemName());
+    system.add(participant_names);
+
+    ASSERT_NO_THROW(
+        system.setParticipantState("test_participant_2", fep3::SystemAggregatedState::unreachable));
+
+    using namespace testing;
+    EXPECT_THAT(system.getSystemState(),
+                AllOf(Field(&fep3::SystemState::_homogeneous, true),
+                      Field(&fep3::SystemState::_state, fep3::SystemAggregatedState::unloaded)));
+
+    ASSERT_EQ(system.getParticipants().size(), 2);
+
+    ASSERT_NO_THROW(system.setSystemState(fep3::SystemAggregatedState::loaded));
+    ASSERT_NO_THROW(system.setSystemState(fep3::SystemAggregatedState::unreachable));
+}
+
+    /**
  * @brief Test whether setParticipantState to undefined throw an exception
  *
  */
@@ -342,5 +361,37 @@ TEST(SystemLibrary, SetParticipantStateToUndefined)
     system.add(participant_name);
 
     ASSERT_THROW_MESSAGE_HAS_SUBSTR(system.setParticipantState(participant_name[0], fep3::SystemAggregatedState::undefined),
-        std::runtime_error, "Invalid setSystemState call at system " + system.getSystemName());
+        std::runtime_error, "Call setSystemState at system " + system.getSystemName() + " with invalid value for argument 'state'");
+}
+
+/**
+ * @brief Test whether setParticipantState logs successful transitions
+ *
+ */
+TEST(SystemLibrary, SetParticipantStateTransitionInfoLogged)
+{
+    System system(makePlatformDepName("test_system"));
+    const std::vector<std::string> participant_names = {"test_participant_1", "test_participant_2"};
+    auto participants = createTestParticipants(participant_names, system.getSystemName());
+    system.add(participant_names);
+
+    using EventMonitorMock = ::testing::NiceMock<fep3::mock::EventMonitor>;
+    using namespace testing;
+    EventMonitorMock system_monitor;
+    EventMonitorMock participant_monitor;
+
+    EXPECT_CALL(system_monitor, onLog(_, Eq(fep3::LoggerSeverity::info), _, _, _))
+        .Times(::testing::AtLeast(1));
+
+    // test participants write all severities
+    EXPECT_CALL(participant_monitor, onLog(_, _, _, _, _)).Times(::testing::AtLeast(1));
+
+    system.registerMonitoring(participant_monitor);
+    system.registerSystemMonitoring(system_monitor);
+
+    ASSERT_NO_THROW(
+        system.setParticipantState(participant_names[0], fep3::SystemAggregatedState::initialized));
+
+    system.unregisterMonitoring(participant_monitor);
+    system.unregisterSystemMonitoring(system_monitor);
 }
