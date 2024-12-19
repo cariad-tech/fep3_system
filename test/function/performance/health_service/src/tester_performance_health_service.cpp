@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2022 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 #include <chrono>
@@ -28,6 +17,7 @@ You may add additional accurate notices of copyright ownership.
 #ifdef WIN32
     #pragma warning( pop )
 #endif
+#include <boost/asio.hpp>
 
 #include <gtest/gtest.h>
 
@@ -38,21 +28,21 @@ You may add additional accurate notices of copyright ownership.
 #include "test_environment.h"
 
 // value printers for gtest
-std::ostream& operator<<(std::ostream& os, const std::chrono::nanoseconds& nanoseconds) 
+void PrintTo(const std::chrono::nanoseconds& nanoseconds, std::ostream* os) 
 {
-    return os << nanoseconds.count() << "ns";
+    *os << nanoseconds.count() << "ns";
 }
-std::ostream& operator<<(std::ostream& os, const std::chrono::microseconds& microseconds) 
+void PrintTo(const std::chrono::microseconds& microseconds, std::ostream* os) 
 {
-    return os << microseconds.count() << "us";
+    *os << microseconds.count() << "us";
 }
-std::ostream& operator<<(std::ostream& os, const std::chrono::milliseconds& milliseconds) 
+void PrintTo(const std::chrono::milliseconds& milliseconds, std::ostream* os) 
 {
-    return os << milliseconds.count() << "ms";
+    *os << milliseconds.count() << "ms";
 }
-std::ostream& operator<<(std::ostream& os, const std::chrono::seconds& seconds) 
+void PrintTo(const std::chrono::seconds& seconds, std::ostream* os) 
 {
-    return os << seconds.count() << "s";
+    *os << seconds.count() << "s";
 }
 
 extern TestEnvironment* g_test_environment;
@@ -65,8 +55,8 @@ class HealthServicePerformance : public ::testing::Test
 {
 public:
     HealthServicePerformance()
-        : participant_output_pipes_(g_test_environment->_number_of_participants)
-        , participant_processes_(g_test_environment->_number_of_participants)
+        : participant_processes_(g_test_environment->_number_of_participants)
+        , participant_process_output_(g_test_environment->_number_of_participants)
     {}
     
     void SetUp() override
@@ -85,13 +75,18 @@ public:
         for(uint32_t participant_index = 0; participant_index < g_test_environment->_number_of_participants; ++participant_index)
         {
             const auto participant_name = participant_names_[participant_index];
+
             participant_processes_[participant_index] = boost::process::child
-                (boost::process::exe = PARTICIPANT_EXECUTABLE_NAME
-                , boost::process::args = {"--name", participant_name, "--system_name", test_system_name}
-                , (boost::process::std_err & boost::process::std_out) > participant_output_pipes_[participant_index]
+            (boost::process::exe = PARTICIPANT_EXECUTABLE_NAME
+                , boost::process::args = { "--name", participant_name, "--system_name", test_system_name }
+                , (boost::process::std_err & boost::process::std_out) > participant_process_output_[participant_index], participant_process_ios_
                 , participant_processes_group_
-                );
+            );
+            
         }
+
+        participant_process_ios_thread_ = std::thread([&]() { participant_process_ios_.run(); });
+
         try
         {
             fep_system_ = discoverSystem
@@ -134,26 +129,37 @@ public:
         fep_system_.deinitialize();
         fep_system_.unload();
         fep_system_.shutdown();
-    
-        EXPECT_TRUE(participant_processes_group_.wait_for(std::chrono::seconds(20)));
+           
+        bool participants_exit_in_time = participant_processes_group_.wait_for(std::chrono::seconds(20));
+        EXPECT_TRUE(participants_exit_in_time);
+
         // cleanup with further information: terminate remaining participant processes and print their output
-        for(size_t participant_index = 0; participant_index < g_test_environment->_number_of_participants; ++participant_index)
+        for (size_t participant_index = 0; participant_index < g_test_environment->_number_of_participants; ++participant_index)
         {
-            if(participant_processes_group_.has(participant_processes_[participant_index]))
+            if (participant_processes_group_.has(participant_processes_[participant_index]))
             {
                 participant_processes_[participant_index].terminate();
-                EXPECT_TRUE(participant_processes_[participant_index].wait_for(std::chrono::seconds(5)))
-                    << "the child process of participant \"" << participant_names_[participant_index] << "\" "
-                    << " couldn't be terminated; the process's output is: "
-                    << std::string(std::istreambuf_iterator<char>(participant_output_pipes_[participant_index]), {});
+            }
+        }
+
+        participant_process_ios_thread_.join();
+
+        if (!participants_exit_in_time) {
+
+            for (size_t participant_index = 0; participant_index < g_test_environment->_number_of_participants; ++participant_index)
+            {
+                auto out = participant_process_output_[participant_index].get();
+                std::cerr << out << std::endl;
             }
         }
     }
 protected:
     // map participant name to index; this helps to avoid expensive string comparisons during test execution
     std::vector<std::string> participant_names_;
-    std::vector<boost::process::ipstream> participant_output_pipes_;
     std::vector<boost::process::child> participant_processes_;
+    std::thread participant_process_ios_thread_;
+    boost::asio::io_service participant_process_ios_;
+    std::vector<std::future<std::string>> participant_process_output_;
     boost::process::group participant_processes_group_;
     std::vector<ParticipantProxy> participant_proxies_;
     std::vector<RPCComponent<rpc::IRPCConfiguration>> configuration_proxies_;

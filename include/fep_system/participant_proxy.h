@@ -2,18 +2,11 @@
  * @file
  * @copyright
  * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
+Copyright 2023 CARIAD SE. 
 
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
+This Source Code Form is subject to the terms of the Mozilla
+Public License, v. 2.0. If a copy of the MPL was not distributed
+with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 @endverbatim
  */
 
@@ -66,14 +59,16 @@ public:
      * @param[in] participant_url participants server url of the participant
      * @param[in] system_name name of the system
      * @param[in] system_url url of the system
-     * @param[in] logger logger to log values to.
+     * @param[in] rpc_server_url url of the RPC Service where remote participants send the logs to.
+     * @param[in] system_logger logger for the system to log values to.
      * @param[in] default_timeout default timeout for each rpc request
      */
     ParticipantProxy(const std::string& participant_name,
         const std::string& participant_url,
         const std::string& system_name,
         const std::string& system_url,
-        std::shared_ptr<ISystemLogger> logger,
+        const std::string& rpc_server_url,
+        std::shared_ptr<ISystemLogger> system_logger,
         std::chrono::milliseconds default_timeout);
     /**
      * @brief Construct a new Participant Proxy object
@@ -305,6 +300,11 @@ public:
     * @return  bool the participant's health listener running state.
     */
     bool getHealthListenerRunningStatus() const;
+
+    /** 
+    * Set participant proxy as unreachable to prevent further RPC calls in d'tor.
+    */
+    void setNotReachable() const;
 
     /// @cond no_documentation
 private:

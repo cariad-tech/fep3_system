@@ -1,69 +1,61 @@
-# Copyright @ 2021 VW Group. All rights reserved.
+# Copyright 2023 CARIAD SE. 
 #
-#     This Source Code Form is subject to the terms of the Mozilla
-#     Public License, v. 2.0. If a copy of the MPL was not distributed
-#     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# If it is not possible or desirable to put the notice in a particular file, then
-# You may include the notice in a location (such as a LICENSE file in a
-# relevant directory) where a recipient would be likely to look for such a notice.
-#
-# You may add additional accurate notices of copyright ownership.
+# This Source Code Form is subject to the terms of the Mozilla
+# Public License, v. 2.0. If a copy of the MPL was not distributed
+# with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 common:
     files:
-        - README.md
         - doc/changelog.md
-        - doc/license/license_notes_from_aosd.txt
         - doc/license/LICENSE.md
-        - doc/license/used_licenses/.+
-        - fep3_system-config.cmake
+        - doc/license/LicenseNotes.md
         - fep3_system-config-version.cmake
-        - fep3_system_test-config.cmake
-        - fep3_system_test-config-version.cmake
+        - fep3_system-config.cmake
         - fep3_system-macros.cmake
-        - include/fep_system/fep_system_version.h
-        - include/fep_system/fep_system.h
-        - include/fep_system/fep_system_export.h
-        - include/fep_system/fep_system_types.h
-        - include/fep_system/rpc_component_proxy.h
-        - include/fep_system/participant_proxy.h
-        - include/fep_system/system_logger_intf.h
-        - include/fep_system/event_monitor_intf.h
-        - include/fep_system/healthiness_types.h
-        - include/fep_system/logging_types_legacy.h
+        - fep3_system_test-config-version.cmake
+        - fep3_system_test-config.cmake
         - include/fep_system/base/logging/logging_types.h
         - include/fep_system/base/properties/properties_intf.h
         - include/fep_system/base/stream_type/stream_type_intf.h
+        - include/fep_system/event_monitor_intf.h
+        - include/fep_system/fep_system.h
+        - include/fep_system/fep_system_export.h
+        - include/fep_system/fep_system_types.h
+        - include/fep_system/fep_system_version.h
+        - include/fep_system/healthiness_types.h
+        - include/fep_system/logging_types_legacy.h
+        - include/fep_system/participant_proxy.h
+        - include/fep_system/rpc_component_proxy.h
+        - include/fep_system/rpc_services/base/fep_rpc_client.h
+        - include/fep_system/rpc_services/base/fep_rpc_client_intf.h
+        - include/fep_system/rpc_services/base/fep_rpc_iid.h
+        - include/fep_system/rpc_services/clock/clock_service_rpc_intf.h
+        - include/fep_system/rpc_services/clock/clock_service_rpc_intf_def.h
         - include/fep_system/rpc_services/configuration/configuration_rpc_intf.h
         - include/fep_system/rpc_services/configuration/configuration_rpc_intf_def.h
         - include/fep_system/rpc_services/data_registry/data_registry_rpc_intf.h
         - include/fep_system/rpc_services/data_registry/data_registry_rpc_intf_def.h
         - include/fep_system/rpc_services/health/health_service_rpc_intf.h
         - include/fep_system/rpc_services/health/health_service_rpc_intf_def.h
-        - include/fep_system/rpc_services/participant_statemachine/participant_statemachine_rpc_intf.h
-        - include/fep_system/rpc_services/participant_statemachine/participant_statemachine_rpc_intf_def.h
-        - include/fep_system/rpc_services/participant_info/participant_info_rpc_intf.h
-        - include/fep_system/rpc_services/participant_info/participant_info_rpc_intf_def.h
-        - include/fep_system/rpc_services/base/fep_rpc_client.h
-        - include/fep_system/rpc_services/base/fep_rpc_iid.h
-        - include/fep_system/rpc_services/base/fep_rpc_client_intf.h
         - include/fep_system/rpc_services/logging/logging_rpc_intf.h
         - include/fep_system/rpc_services/logging/logging_service_rpc_intf_def.h
-        - include/fep_system/rpc_services/clock/clock_service_rpc_intf_def.h
-        - include/fep_system/rpc_services/clock/clock_service_rpc_intf.h
+        - include/fep_system/rpc_services/participant_info/participant_info_rpc_intf.h
+        - include/fep_system/rpc_services/participant_info/participant_info_rpc_intf_def.h
+        - include/fep_system/rpc_services/participant_statemachine/participant_statemachine_rpc_intf.h
+        - include/fep_system/rpc_services/participant_statemachine/participant_statemachine_rpc_intf_def.h
         - include/fep_system/rpc_services/rpc_passthrough/rpc_passthrough_intf.h
         - include/fep_system/rpc_services/service_bus/http_server_rpc_intf.h
         - include/fep_system/rpc_services/service_bus/http_server_rpc_intf_def.h
-        - test/include/fep_system/mock_event_monitor.h
+        - include/fep_system/system_logger_intf.h
+        - lib/cmake/fep3_dds_service_bus_plugin_targets.cmake
+        - lib/cmake/fep3_http_service_bus_targets.cmake
         - lib/cmake/fep3_system_targets.cmake
         - lib/cmake/fep3_system_test_targets.cmake
         - lib/fep3_system.fep_components
-        - lib/cmake/fep3_http_service_bus_targets.cmake
-        - lib/cmake/fep3_dds_service_bus_plugin_targets.cmake
         - lib/rti/USER_QOS_PROFILES.xml
-        - test/results/function/tester_discover_system_participants.xml
-        - test/results/function/tester_health_service_helpers.xml
+        - README.md
+        - test/include/fep_system/mock_event_monitor.h
+        - test/results/function/tester_result_private_tests.xml
 
 linux_shared_debug:
     conditions:
@@ -71,7 +63,7 @@ linux_shared_debug:
             os: Linux
             build_type: Debug
     files:
-        - lib/libfep3_systemd3.2.so
+        - lib/libfep3_systemd3.3.so
         - lib/cmake/fep3_system_targets-debug.cmake
         - lib/cmake/fep3_http_service_bus_targets-debug.cmake
         - lib/cmake/fep3_dds_service_bus_plugin_targets-debug.cmake
@@ -89,7 +81,7 @@ linux_shared_rel_with_deb_info:
             os: Linux
             build_type: RelWithDebInfo
     files:
-        - lib/libfep3_system3.2.so
+        - lib/libfep3_system3.3.so
         - lib/cmake/fep3_system_targets-relwithdebinfo.cmake
         - lib/cmake/fep3_http_service_bus_targets-relwithdebinfo.cmake
         - lib/cmake/fep3_dds_service_bus_plugin_targets-relwithdebinfo.cmake
@@ -115,9 +107,9 @@ windows_shared_debug:
             os: Windows
             build_type: Debug
     files:
-        - lib/fep3_systemd3.2.dll
-        - lib/fep3_systemd3.2.lib
-        - lib/fep3_systemd3.2.pdb
+        - lib/fep3_systemd3.3.dll
+        - lib/fep3_systemd3.3.lib
+        - lib/fep3_systemd3.3.pdb
         - lib/http/fep3_http_service_bus.pdb
         - lib/rti/fep3_dds_service_bus_plugin.pdb
         - lib/cmake/fep3_system_targets-debug.cmake
@@ -150,9 +142,9 @@ windows_shared_rel_with_deb_info:
         - lib/cmake/fep3_system_targets-relwithdebinfo.cmake
         - lib/http/fep3_http_service_bus.pdb
         - lib/rti/fep3_dds_service_bus_plugin.pdb
-        - lib/fep3_system3.2.dll
-        - lib/fep3_system3.2.lib
-        - lib/fep3_system3.2.pdb
+        - lib/fep3_system3.3.dll
+        - lib/fep3_system3.3.lib
+        - lib/fep3_system3.3.pdb
         - lib/rti/nddsc.dll
         - lib/rti/nddscore.dll
         - lib/rti/nddscpp.dll
@@ -175,8 +167,6 @@ linux_armv8:
             os: Linux
             arch: armv8
     files:
-        - lib/fep3_system\.cpython-38-aarch64-linux-gnu\.so
-        - lib/fep3_system\.cpython-39-aarch64-linux-gnu\.so
         - lib/fep3_system\.cpython-310-aarch64-linux-gnu\.so
         - lib/event_monitor\.py
 
@@ -186,8 +176,6 @@ linux_x86_64:
             os: Linux
             arch: x86_64
     files:
-        - lib/fep3_system\.cpython-38-x86_64-linux-gnu\.so
-        - lib/fep3_system\.cpython-39-x86_64-linux-gnu\.so
         - lib/fep3_system\.cpython-310-x86_64-linux-gnu\.so
         - lib/event_monitor\.py
 
@@ -196,8 +184,6 @@ windows:
         my_conds:
             os: Windows
     files:
-        - lib/fep3_system\.cp38-win_amd64\.pyd
-        - lib/fep3_system\.cp39-win_amd64\.pyd
         - lib/fep3_system\.cp310-win_amd64\.pyd
         - lib/event_monitor\.py
 
@@ -223,14 +209,3 @@ documentation:
         - doc/html/\.buildinfo
         - doc/license/LICENSE.md
 
-multiple_builds:
-    conditions:
-        armv8:
-            arch: armv8
-        x86_64:
-            arch: x86_64
-    files:
-        - test/results/function/tester_discover_system_participants_1.xml
-        - test/results/function/tester_health_service_helpers_1.xml
-        - test/results/function/tester_discover_system_participants_2.xml
-        - test/results/function/tester_health_service_helpers_2.xml

@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
@@ -32,8 +21,10 @@ You may add additional accurate notices of copyright ownership.
 #include <a_util/strings.h>
 
 #define FEP3_CONFIG_LOG_RESULT(_res_, _participant_name_, _component_name_, _method_, _path_) { \
-_logger.log(LoggerSeverity::error, _participant_name_, \
-_component_name_, \
+_logger.logProxyError(                                                                     \
+            LoggerSeverity::error,                                                                 \
+            _participant_name_,                                                                    \
+            _component_name_, \
 a_util::strings::format("Can not %s '%s' due to following error : (%d - %s - %s)  ", \
     _method_.c_str(), \
     _path_.c_str(), \

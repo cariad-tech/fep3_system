@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2022 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 #include "participant_health_listener.h"
 namespace fep3
@@ -42,6 +31,7 @@ namespace fep3
         // do not lock the rpc call
         if ((_participant_name == service_update_event.service_name) &&
             (_system_name == service_update_event.system_name) &&
+            (fep3::IServiceBus::ServiceUpdateEventType::notify_alive == service_update_event.event_type)&&
             _rpc_health_service)
         {
             {

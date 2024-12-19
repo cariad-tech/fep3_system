@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
@@ -23,12 +12,11 @@ You may add additional accurate notices of copyright ownership.
 
 #include <gtest/gtest.h>
 #include <boost/process.hpp>
-#include <a_util/filesystem.h>
-#include <a_util/strings.h>
 
 #include <fep_system/fep_system.h>
 #include <fep3/components/clock/clock_service_intf.h>
 #include <fep_system/event_monitor_intf.h>
+#include <fep3/fep3_filesystem.h>
 
 #include <array>
 #include <fstream>
@@ -117,21 +105,21 @@ TEST(Determinism, TransmissionReception)
     bp::group participant_processes_group;
     const auto test_system_name = makePlatformDepName("test_system");
     bp::child transmitter_one_process
-        (bp::search_path("transmitter_one", { boost::filesystem::current_path() })
+    (bp::search_path("transmitter_one", { boost::filesystem::current_path() })
         , bp::args = {"--name", "test_transmitter_one", "--system_name", test_system_name}
         , bp::std_out > stdout
         , bp::std_err > stderr
         , participant_processes_group
         );
     bp::child transmitter_two_process
-        (bp::search_path("transmitter_two", { boost::filesystem::current_path() })
+    (bp::search_path("transmitter_two", { boost::filesystem::current_path() })
         , bp::args = {"--name", "test_transmitter_two", "--system_name", test_system_name}
         , bp::std_out > stdout
         , bp::std_err > stderr
         , participant_processes_group
         );
     bp::child receiver_process
-        (bp::search_path("receiver", { boost::filesystem::current_path() })
+    (bp::search_path("receiver", { boost::filesystem::current_path() })
         , bp::args = {"--name", "test_receiver", "--system_name", test_system_name}
         , bp::std_out > stdout
         , bp::std_err > stderr

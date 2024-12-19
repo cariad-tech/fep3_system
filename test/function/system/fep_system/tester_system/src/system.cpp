@@ -1,20 +1,9 @@
 /**
- * @file
- * @copyright
- * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
-
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
-@endverbatim
+ * Copyright 2023 CARIAD SE.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 
@@ -34,14 +23,17 @@ You may add additional accurate notices of copyright ownership.
 #include <fep_system/fep_system.h>
 #include <string.h>
 #include <functional>
+#include <chrono>
+#include <thread>
 #include <fep_test_common.h>
-#include <a_util/logging.h>
 #include <a_util/process.h>
-#include <a_util/system.h>
 #include <boost/range/irange.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/algorithm/cxx11/is_permutation.hpp>
+#include <boost/thread/latch.hpp>
+
+#include<include/fep_system/mock_event_monitor.h>
 
 #include <fep3/components/configuration/configuration_service_intf.h>
 #include <fep3/components/clock/clock_service_intf.h>
@@ -388,17 +380,17 @@ TEST(SystemLibrary, SystemCtors)
         System copied_assigned_sys = test_system;
         ASSERT_EQ(test_system.getSystemName(), "orig");
         ASSERT_EQ(copied_assigned_sys.getSystemName(), "orig");
-ASSERT_TRUE(hasTestParticipants(test_system));
-ASSERT_TRUE(hasTestParticipants(copied_assigned_sys));
+        ASSERT_TRUE(hasTestParticipants(test_system));
+        ASSERT_TRUE(hasTestParticipants(copied_assigned_sys));
     }
 
     {
-    //moved CTOR will have a system_name which is empty
-    System test_system("orig");
-    addingTestParticipants(test_system);
-    System moved_assigned_sys = std::move(test_system);
-    ASSERT_EQ(moved_assigned_sys.getSystemName(), "orig");
-    ASSERT_TRUE(hasTestParticipants(moved_assigned_sys));
+        //moved CTOR will have a system_name which is empty
+        System test_system("orig");
+        addingTestParticipants(test_system);
+        System moved_assigned_sys = std::move(test_system);
+        ASSERT_EQ(moved_assigned_sys.getSystemName(), "orig");
+        ASSERT_TRUE(hasTestParticipants(moved_assigned_sys));
     }
 }
 
@@ -442,7 +434,6 @@ public:
         _severity_level = severity_level;
         _participant_name = participant_name;
         _logger_name = logger_name;
-        _message = message;
         _messages.push_back(message);
         _done = true;
     }
@@ -458,7 +449,7 @@ public:
         auto single_wait = timeout_ms / 10;
         while (!_done && i < 10)
         {
-            a_util::system::sleepMilliseconds(static_cast<uint32_t>(single_wait));
+            std::this_thread::sleep_for(std::chrono::milliseconds(single_wait));
             ++i;
         }
         if (_done)
@@ -471,33 +462,24 @@ public:
 
     bool waitFor(const std::string& message, timestamp_t timeout_ms = 4000)
     {
-        auto begin_time = a_util::system::getCurrentMilliseconds();
+        auto begin_time = std::chrono::high_resolution_clock::now();
         {
             auto single_wait = timeout_ms / 10;
-            while (timeout_ms > (a_util::system::getCurrentMilliseconds() - begin_time))
+            while (std::chrono::milliseconds(timeout_ms) > (std::chrono::high_resolution_clock::now() - begin_time))
             {
-                std::string current_message;
-                {
-                    std::unique_lock<std::mutex> lk(_cv_m);
-                    current_message = _message;
-                }
-                if (current_message.find(message) != std::string::npos)
+                if (checkForLogMessage(message)) 
                 {
                     return true;
                 }
-                a_util::system::sleepMilliseconds(static_cast<uint32_t>(single_wait));
+                std::this_thread::sleep_for(std::chrono::milliseconds(single_wait));
             }
         }
-        std::string current_message_final;
-        {
-            std::unique_lock<std::mutex> lk(_cv_m);
-            current_message_final = _message;
-        }
-        return (current_message_final.find(message) != std::string::npos);
+        return checkForLogMessage(message);
     }
 
     bool checkForLogMessage(const std::string& message_to_search_for)
     {
+        std::unique_lock<std::mutex> lk(_cv_m);
         for (const auto& message : _messages)
         {
             if (message.find(message_to_search_for) != std::string::npos)
@@ -511,7 +493,6 @@ public:
     fep3::Category _category;
     fep3::LoggerSeverity _severity_level;
     std::string _participant_name;
-    std::string _message;
     std::vector<std::string> _messages;
     std::string _logger_name;
     std::vector<fep3::rpc::ParticipantState> _states;
@@ -590,13 +571,11 @@ TEST(SystemLibrary, TestConfigureSystemNOK)
         }
         catch (std::runtime_error e)
         {
-            auto msg = e.what();
-            ASSERT_TRUE(a_util::strings::isEqual(msg, "No Participant with the name does_not_exist found"));
             caught = true;
         }
         ASSERT_TRUE(caught);
 
-        ASSERT_TRUE(fep3::rpc::arya::IRPCParticipantStateMachine::State::undefined == my_sys.getSystemState()._state);
+        ASSERT_TRUE(fep3::rpc::catelyn::IRPCParticipantStateMachine::State::unreachable == my_sys.getSystemState()._state);
 
     }
 }
@@ -652,10 +631,30 @@ TEST_F(SystemLibraryWithTestSystem, TestControlSystemOK)
     my_sys.deinitialize();
     my_sys.unload();
     my_sys.shutdown();
+
     state1 = p1.getRPCComponentProxyByIID<fep3::rpc::IRPCParticipantStateMachine>()->getState();
     state2 = p2.getRPCComponentProxyByIID<fep3::rpc::IRPCParticipantStateMachine>()->getState();
     ASSERT_EQ(state1, fep3::rpc::ParticipantState::unreachable);
     ASSERT_EQ(state2, fep3::rpc::ParticipantState::unreachable);
+
+    ASSERT_EQ(my_sys.getParticipantState("participant1"), fep3::rpc::ParticipantState::unreachable);
+    ASSERT_EQ(my_sys.getParticipantState("participant2"), fep3::rpc::ParticipantState::unreachable);
+
+    using ::testing::Field;
+    EXPECT_THAT(my_sys.getSystemState(),
+                AllOf(Field(&fep3::SystemState::_homogeneous, true),
+                      Field(&fep3::SystemState::_state, fep3::SystemAggregatedState::unreachable)));
+
+    ASSERT_EQ(my_sys.getParticipants().size(), 0);
+}
+
+TEST(TestEmptySytem, StateUnreachable)
+{
+    fep3::System system;
+    using ::testing::Field;
+    EXPECT_THAT(system.getSystemState(),
+                AllOf(Field(&fep3::SystemState::_homogeneous, true),
+                      Field(&fep3::SystemState::_state, fep3::SystemAggregatedState::unreachable)));
 }
 
 using State = fep3::rpc::ParticipantState;
@@ -792,7 +791,7 @@ TEST(SystemLibrary, TestControlSystemNOK)
         fep3::System my_sys(sys_name);
         // test with element that doesn't exist
         TestEventMonitor tem;
-        my_sys.registerMonitoring(tem);
+        my_sys.registerSystemMonitoring(tem);
         my_sys.add("does_not_exist");
         bool caught = false;
         try
@@ -801,8 +800,6 @@ TEST(SystemLibrary, TestControlSystemNOK)
         }
         catch (std::runtime_error e)
         {
-            std::string msg = e.what();
-            ASSERT_STREQ("Participant does_not_exist is unreachable", msg.c_str());
             caught = true;
         }
         ASSERT_TRUE(caught);
@@ -823,9 +820,8 @@ TEST(SystemLibrary, TestControlSystemNOK)
         ASSERT_TRUE(caught);
         // but logging message
         ASSERT_TRUE(tem.waitForDone());
-        ASSERT_TRUE(tem._message.find("No participant has a statemachine") != std::string::npos);
-        ASSERT_TRUE(tem._severity_level == fep3::LoggerSeverity::error);
-        my_sys.unregisterMonitoring(tem);
+        ASSERT_TRUE(tem.checkForLogMessage("No participant in system '" + sys_name + "' is reachable."));
+        my_sys.unregisterSystemMonitoring(tem);
     }
 }
 
@@ -849,51 +845,114 @@ struct NotInitializableTestSystem : public ::testing::Test {
     fep3::System my_sys;
 };
 
-TEST_F(NotInitializableTestSystem, TestStartSystemNOK)
+TEST_F(NotInitializableTestSystem, TestStartSystem_withFaultyParticipant_SerialPolicy_failed)
 {
     TestEventMonitor tem;
-    my_sys.registerMonitoring(tem);
+    my_sys.registerSystemMonitoring(tem);
     auto p1 = my_sys.getParticipant(part_name_1);
     auto p2 = my_sys.getParticipant(part_name_2);
-
-    // Trying to start a system of participants which fail to initialize shall result in a system of state loaded
+    // for parallel policy we break as soon as the first error appears, so there is no guarantee
+    //  which error will appear first
+    my_sys.setInitAndStartPolicy(fep3::System::InitStartExecutionPolicy::sequential, 4);
+    // Trying to start a system of participants which fail to initialize shall result in a system of
+    // state loaded
     {
-        EXPECT_THROW(my_sys.setSystemState({ fep3::SystemAggregatedState::running }, std::chrono::milliseconds(500)),
-            std::runtime_error);
+        EXPECT_THROW(my_sys.setSystemState({fep3::SystemAggregatedState::running},
+                                           std::chrono::milliseconds(500)),
+                     std::runtime_error);
 
         ASSERT_TRUE(tem.waitForDone());
 
         ASSERT_TRUE(tem.checkForLogMessage("System loaded successfully"));
-        ASSERT_TRUE(tem.checkForLogMessage("Participant participant1 threw exception"));
-        ASSERT_TRUE(tem.checkForLogMessage("Participant participant2 threw exception"));
-        ASSERT_TRUE(tem.checkForLogMessage("could not be initialized successfully and remains in state 'loaded'"));
-        ASSERT_TRUE(tem.checkForLogMessage("System could not be initialized in a homogeneous way"));
-        ASSERT_TRUE(tem.checkForLogMessage("No participant has a statemachine"));
+        ASSERT_TRUE(
+            tem.checkForLogMessage("Participant '" + part_name_1 + "' in system '" + sys_name +
+                                   "' threw exception: 'state machine 'initialize' denied."));
+        ASSERT_TRUE(tem.checkForLogMessage(
+            "Participant '" + part_name_1 +
+            "' could not be 'initialized' successfully and remains in state 'loaded'"));
+        ASSERT_TRUE(
+            tem.checkForLogMessage("Cannot set homogenous state of the system '" + sys_name + "'"));
 
-        ASSERT_EQ(p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(), fep3::rpc::ParticipantState::loaded);
-        ASSERT_EQ(p2.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(), fep3::rpc::ParticipantState::loaded);
+        ASSERT_EQ(p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(),
+                  fep3::rpc::ParticipantState::loaded);
+        ASSERT_EQ(p2.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(),
+                  fep3::rpc::ParticipantState::loaded);
     }
 
     // The system shall be unloaded successfully
     {
-        EXPECT_NO_THROW(my_sys.setSystemState({ fep3::SystemAggregatedState::unloaded }, std::chrono::milliseconds(500)));
+        EXPECT_NO_THROW(my_sys.setSystemState({fep3::SystemAggregatedState::unloaded},
+                                              std::chrono::milliseconds(500)));
 
         ASSERT_TRUE(tem.waitForDone());
 
         ASSERT_TRUE(tem.checkForLogMessage("System unloaded successfully"));
 
-        ASSERT_EQ(p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(), fep3::rpc::ParticipantState::unloaded);
-        ASSERT_EQ(p2.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(), fep3::rpc::ParticipantState::unloaded);
+        ASSERT_EQ(p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(),
+                  fep3::rpc::ParticipantState::unloaded);
+        ASSERT_EQ(p2.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(),
+                  fep3::rpc::ParticipantState::unloaded);
     }
 
-    my_sys.unregisterMonitoring(tem);
+    my_sys.unregisterSystemMonitoring(tem);
 }
+
+TEST_F(NotInitializableTestSystem, TestStartSystem_withFaultyParticipant_ParallelPolicy_failed)
+{
+    TestEventMonitor tem;
+    my_sys.registerSystemMonitoring(tem);
+    auto p1 = my_sys.getParticipant(part_name_1);
+    auto p2 = my_sys.getParticipant(part_name_2);
+
+    // Trying to start a system of participants which fail to initialize shall result in a system of
+    // state loaded
+    {
+        EXPECT_THROW(my_sys.setSystemState({fep3::SystemAggregatedState::running},
+                                           std::chrono::milliseconds(500)),
+                     std::runtime_error);
+
+        ASSERT_TRUE(tem.waitForDone());
+
+        ASSERT_TRUE(tem.checkForLogMessage("System loaded successfully"));
+        // for parallel policy we break as soon as the first error appears, so there is no guarantee
+        // which error will appear first
+        ASSERT_TRUE(tem.checkForLogMessage(
+            "' in system '" + sys_name + "' threw exception: 'state machine 'initialize' denied."));
+        ASSERT_TRUE(tem.checkForLogMessage(
+            "' could not be 'initialized' successfully and remains in state 'loaded'"));
+        ASSERT_TRUE(
+            tem.checkForLogMessage("Cannot set homogenous state of the system '" + sys_name + "'"));
+
+        ASSERT_EQ(p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(),
+                  fep3::rpc::ParticipantState::loaded);
+        ASSERT_EQ(p2.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(),
+                  fep3::rpc::ParticipantState::loaded);
+    }
+
+    // The system shall be unloaded successfully
+    {
+        EXPECT_NO_THROW(my_sys.setSystemState({fep3::SystemAggregatedState::unloaded},
+                                              std::chrono::milliseconds(500)));
+
+        ASSERT_TRUE(tem.waitForDone());
+
+        ASSERT_TRUE(tem.checkForLogMessage("System unloaded successfully"));
+
+        ASSERT_EQ(p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(),
+                  fep3::rpc::ParticipantState::unloaded);
+        ASSERT_EQ(p2.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(),
+                  fep3::rpc::ParticipantState::unloaded);
+    }
+
+    my_sys.unregisterSystemMonitoring(tem);
+}
+
 
 TEST_F(NotInitializableTestSystem, TestStartSystemPartiallyOK)
 {
         TestEventMonitor tem;
-        my_sys.registerMonitoring(tem);
-        
+        my_sys.registerSystemMonitoring(tem);
+
         // test with valid participants within the system which shall reach the corresponding state
         const std::string part_name_3 = "participant3";
         const auto test_parts_valid = createTestParticipants({ part_name_3 }, sys_name);
@@ -901,23 +960,29 @@ TEST_F(NotInitializableTestSystem, TestStartSystemPartiallyOK)
         auto p1 = my_sys.getParticipant(part_name_1);
         auto p2 = my_sys.getParticipant(part_name_2);
         auto p3 = my_sys.getParticipant(part_name_3);
+        //for parallel policy we break as soon as the first error appears, so there is no guarantee
+        // which error will appear first
+        my_sys.setInitAndStartPolicy(fep3::System::InitStartExecutionPolicy::sequential, 4);
+
+        p3.setInitPriority(10);
 
         // Trying to start a system of participants which fail to initialize and a valid participant
+        // participant 3 will be initialized successfully but participant 1 returns an error
+        // and participants 1 and 2 remain in loaded
         // shall result in a system of heterogeneous state loaded/running
         {
-            EXPECT_NO_THROW(my_sys.setSystemState({ fep3::SystemAggregatedState::running }, std::chrono::milliseconds(500)));
+            EXPECT_THROW(my_sys.setSystemState({ fep3::SystemAggregatedState::running }, std::chrono::milliseconds(500)), std::runtime_error);
 
             ASSERT_TRUE(tem.waitForDone());
 
             ASSERT_TRUE(tem.checkForLogMessage("System loaded successfully"));
-            ASSERT_TRUE(tem.checkForLogMessage("Participant participant1 threw exception"));
-            ASSERT_TRUE(tem.checkForLogMessage("Participant participant2 threw exception"));
-            ASSERT_TRUE(tem.checkForLogMessage("could not be initialized successfully and remains in state 'loaded'"));
-            ASSERT_TRUE(tem.checkForLogMessage("System could not be initialized in a homogeneous way"));
+            ASSERT_TRUE(tem.checkForLogMessage("Participant '" + part_name_1 + "' in system '" + sys_name + "' threw exception: 'state machine 'initialize' denied."));
+            ASSERT_TRUE(tem.checkForLogMessage("Participant '" + part_name_1 + "' could not be 'initialized' successfully and remains in state 'loaded'"));
+            ASSERT_TRUE(tem.checkForLogMessage("Cannot set homogenous state of the system '" + sys_name + "'"));
 
             ASSERT_EQ(p1.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(), fep3::rpc::ParticipantState::loaded);
             ASSERT_EQ(p2.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(), fep3::rpc::ParticipantState::loaded);
-            ASSERT_EQ(p3.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(), fep3::rpc::ParticipantState::running);
+            ASSERT_EQ(p3.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(), fep3::rpc::ParticipantState::initialized);
         }
 
         // The system shall be unloaded successfully
@@ -933,7 +998,7 @@ TEST_F(NotInitializableTestSystem, TestStartSystemPartiallyOK)
             ASSERT_EQ(p3.getRPCComponentProxy<fep3::rpc::IRPCParticipantStateMachine>()->getState(), fep3::rpc::ParticipantState::unloaded);
         }
 
-        my_sys.unregisterMonitoring(tem);
+        my_sys.unregisterSystemMonitoring(tem);
 }
 
 TEST(SystemLibrary, TestMonitorSystemOK)
@@ -960,12 +1025,12 @@ TEST(SystemLibrary, TestMonitorSystemOK)
 
         //this test is only possible if we have the logging system reactivatd
         ASSERT_TRUE(tem._participant_name.find(part_name_1) != std::string::npos);
-        ASSERT_TRUE(tem._message.find("Successfully start") != std::string::npos);
+        ASSERT_TRUE(tem.checkForLogMessage("Successfully start"));
 
         my_sys.setSystemState(fep3::System::AggregatedState::initialized);
 
         EXPECT_TRUE(tem.waitFor("Successfully stop", 5000));
-        ASSERT_TRUE(tem._message.find("Successfully stop") != std::string::npos);
+        ASSERT_TRUE(tem.checkForLogMessage("Successfully stop"));
 
         // unregister monitoring is important!
         my_sys.unregisterMonitoring(tem);
@@ -981,6 +1046,7 @@ TEST_F(SystemLibraryWithTestSystem, TestGetAClock)
         using namespace std::chrono;
         TestEventMonitor tem;
         my_sys.registerMonitoring(tem);
+        my_sys.setSeverityLevel(fep3::LoggerSeverity::debug);
 
         my_sys.load();
 
@@ -997,7 +1063,7 @@ TEST_F(SystemLibraryWithTestSystem, TestGetAClock)
             ASSERT_TRUE(logging_service_part2);
             ASSERT_TRUE(logging_service_part2->setLoggerFilter("Testelement.element", { fep3::LoggerSeverity::off, {} }));
             ASSERT_TRUE(logging_service_part2->setLoggerFilter("participant", { fep3::LoggerSeverity::off, {} }));
-            ASSERT_TRUE(logging_service_part2->setLoggerFilter("slave_clock.clock_sync_service.component", { fep3::LoggerSeverity::debug, {"console", "rpc"} }));
+            ASSERT_TRUE(logging_service_part2->setLoggerFilter("rpc_clock_sync_slave.clock_sync_service.component", { fep3::LoggerSeverity::debug, {"console", "rpc"} }));
 
             auto logging_service_part1 = my_sys.getParticipant(part_name_1).getRPCComponentProxyByIID<fep3::rpc::IRPCLoggingService>();
             ASSERT_TRUE(logging_service_part1);
@@ -1021,7 +1087,7 @@ TEST_F(SystemLibraryWithTestSystem, TestGetAClock)
         }
 
         // we wait for the synchronization of the timing client until we check the rpc time calls
-        ASSERT_TRUE(tem.waitFor("Retrieved master time"));
+        ASSERT_TRUE(tem.waitFor("Retrieved master time", 10000));
 
         auto part1 = my_sys.getParticipant(part_name_1).getRPCComponentProxyByIID<fep3::rpc::IRPCClockService>();
         ASSERT_TRUE(part1);
@@ -1508,6 +1574,42 @@ TEST_F(TestTransitionPolicy, testParallelInitDiferrentPrio)
 
     // shutdown system
     _my_sys.stop();
+    _my_sys.deinitialize();
+    _my_sys.unload();
+    _my_sys.shutdown();
+}
+
+class TestTransitionTimeoutWarning : public TestTransitionPolicy {
+};
+
+TEST_F(TestTransitionTimeoutWarning, transitionDurationLongerAsTimeout_warning_logged)
+{
+    using ::testing::InvokeWithoutArgs;
+    using ::testing::_;
+    using ::testing::HasSubstr;
+    using namespace std::chrono_literals;
+
+    testing::NiceMock<fep3::mock::EventMonitor> _event_monitor;
+    boost::latch _latch(_participant_count+1);
+
+
+    _my_sys.registerSystemMonitoring(_event_monitor);
+
+    EXPECT_CALL(_event_monitor, onLog(_, fep3::LoggerSeverity::warning, _, _, HasSubstr("Timeout")))
+        .WillOnce(InvokeWithoutArgs([&_latch]() {
+            _latch.count_down_and_wait();
+        }));
+
+    EXPECT_CALL(_tc, StateInMock()).Times(_participant_count).WillRepeatedly(InvokeWithoutArgs([&_latch]() {
+        _latch.count_down_and_wait();
+    }));
+    EXPECT_CALL(_tc, StateOutMock()).Times(_participant_count);
+
+    _my_sys.load();
+    _my_sys.initialize(500ms);
+
+    _my_sys.unregisterSystemMonitoring(_event_monitor);
+
     _my_sys.deinitialize();
     _my_sys.unload();
     _my_sys.shutdown();

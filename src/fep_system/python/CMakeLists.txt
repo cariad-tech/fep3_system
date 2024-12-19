@@ -1,22 +1,21 @@
-# Copyright @ 2021 VW Group. All rights reserved.
+# Copyright 2023 CARIAD SE. 
 # 
-#     This Source Code Form is subject to the terms of the Mozilla
-#     Public License, v. 2.0. If a copy of the MPL was not distributed
-#     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-# 
-# If it is not possible or desirable to put the notice in a particular file, then
-# You may include the notice in a location (such as a LICENSE file in a
-# relevant directory) where a recipient would be likely to look for such a notice.
-# 
-# You may add additional accurate notices of copyright ownership.
+# This Source Code Form is subject to the terms of the Mozilla
+# Public License, v. 2.0. If a copy of the MPL was not distributed
+# with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 find_package(Python ${fep3_system_cmake_python_version} EXACT
                     REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
+find_package(Boost 1.73.0 REQUIRED COMPONENTS date_time)
 
 pybind11_add_module(fep3_system_py fep_system_py.cpp)
 
-target_link_libraries(fep3_system_py PRIVATE fep3_system)
+target_link_libraries(fep3_system_py 
+        PRIVATE
+        fep3_system
+        dev_essential::strings
+        Boost::date_time)
 
 target_sources(fep3_system_py PRIVATE event_monitor.py)
 set_target_properties(fep3_system_py PROPERTIES FOLDER system_library

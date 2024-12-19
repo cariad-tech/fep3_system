@@ -2,18 +2,11 @@
  * @file
  * @copyright
  * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
+Copyright 2023 CARIAD SE. 
 
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
+This Source Code Form is subject to the terms of the Mozilla
+Public License, v. 2.0. If a copy of the MPL was not distributed
+with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 @endverbatim
  */
 
@@ -33,7 +26,7 @@ You may add additional accurate notices of copyright ownership.
 ///The fep::System default timeout for every fep3::System call that need to connect to a far participant
 #define FEP_SYSTEM_DEFAULT_TIMEOUT std::chrono::milliseconds(500)
 ///The fep::System state transition timeout for every fep3::System call that need to change the states of the participants
-#define FEP_SYSTEM_TRANSITION_TIMEOUT std::chrono::milliseconds(10000)
+#define FEP_SYSTEM_TRANSITION_TIMEOUT std::chrono::milliseconds(60000)
 ///The fep::discoverSystem default timeout
 #define FEP_SYSTEM_DISCOVER_TIMEOUT std::chrono::milliseconds(1000)
 ///The fep::ParticipantProxy default timeout for every fep::ParticipantProxy call that need to connect the participant
@@ -51,7 +44,7 @@ namespace fep3
      * @brief A map of participant name and participant state.
      *
      */
-    using ParticipantStates = std::map<std::string, fep3::rpc::arya::IRPCParticipantStateMachine::State>;
+    using ParticipantStates = std::map<std::string, fep3::rpc::catelyn::IRPCParticipantStateMachine::State>;
 
     /**
      * @brief System state
@@ -357,7 +350,6 @@ namespace fep3
         *
         * @param[in] participant_name   name of the participant
         * @return SystemAggregatedState the state of the requested participant
-        * @throw runtime_error          if participant is not found
         */
         SystemAggregatedState getParticipantState(const std::string& participant_name) const;
 
@@ -413,7 +405,7 @@ namespace fep3
 
         /**
         * @c adds the list of participants to the system in an asynchronous execution
-        *         Function returnes once the participants are added to the system.
+        *         Function returns once the participants are added to the system.
         * @param[in]   participants         map of participant names and url pairs
         * @param[in]   pool_size            size of the thread pool to be used for the parallel execution.
         *
@@ -579,26 +571,47 @@ namespace fep3
         std::string getSystemUrl() const;
 
         /**
-        * Register monitoring listener for state and name changed notifications of the whole system
+        * Register monitoring listener for the participant loggers of the system
         *
         * On Failure an Incident will be send with a detailed description
-        * @param[in] event_listener The listener
+        * @param[in] event_listener The listener to register monitoring of participant logs
         */
         void registerMonitoring(IEventMonitor& event_listener);
 
         /**
-         * Unregister monitoring listener for state and name changed and logging notifications
+         * Unregister monitoring listener for the participant loggers of the system
          *
-         * @param[in] event_listener The listener
+        * @param[in] event_listener The listener to deregister from monitoring
          */
         void unregisterMonitoring(IEventMonitor& event_listener);
 
         /**
-         * @brief Set the System Severity Level for all participants
+        * @brief Set the severity level for all participant logs received by the system
+        *
+        * @param[in] severity_level minimum severity level
+        */
+        void setSeverityLevel(LoggerSeverity severity_level);
+
+        /**
+        * Register monitoring listener for the system logger
+        *
+        * On Failure an Incident will be send with a detailed description
+        * @param[in] event_listener The listener to register monitoring of system logger logs
+        */
+        void registerSystemMonitoring(IEventMonitor& event_listener);
+
+        /**
+        * Unregister monitoring listener for the system logger
+        * @param[in] event_listener The listener to deregister from monitoring
+        */
+        void unregisterSystemMonitoring(IEventMonitor& event_listener);
+
+        /**
+         * @brief Set the severity level for the system logger
          *
          * @param[in] severity_level minimum severity level
          */
-        void setSeverityLevel(LoggerSeverity severity_level);
+        void setSystemSeverityLevel(LoggerSeverity severity_level);
 
         /**
          * @brief Set the execution policy for initialization and start state transition.
@@ -844,7 +857,7 @@ namespace fep3
      *
      * discoverAllSystems discovers all participants at all systems on the default discovery url.
      * The default url will be taken which is provided by fep participant library. The discovery will return
-     * once at least the participants given by @p participant_names are discovered or the discovery time
+     * once at least the number of participants given by @p participant_count is discovered or the discovery time
      * defined by @p timeout expired.
      *
      * It will use the default service bus discovery provided by the fep participant library

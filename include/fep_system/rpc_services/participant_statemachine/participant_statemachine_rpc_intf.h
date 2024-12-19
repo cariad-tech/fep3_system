@@ -2,18 +2,11 @@
  * @file
  * @copyright
  * @verbatim
-Copyright @ 2021 VW Group. All rights reserved.
+Copyright 2023 CARIAD SE. 
 
-    This Source Code Form is subject to the terms of the Mozilla
-    Public License, v. 2.0. If a copy of the MPL was not distributed
-    with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-If it is not possible or desirable to put the notice in a particular file, then
-You may include the notice in a location (such as a LICENSE file in a
-relevant directory) where a recipient would be likely to look for such a notice.
-
-You may add additional accurate notices of copyright ownership.
-
+This Source Code Form is subject to the terms of the Mozilla
+Public License, v. 2.0. If a copy of the MPL was not distributed
+with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 @endverbatim
  */
 
@@ -32,33 +25,36 @@ namespace rpc
 {
 namespace arya
 {
-/**
- * @brief Participant State
- *
- */
-enum ParticipantState
+    /**
+     * @brief Participant State
+     *
+     */
+    enum ParticipantState
+    {
+        // [[deprecated]], undefined state is deprecated. only unreachable is used
+        undefined,
+        ///This state is used if the participant is shut down or
+        /// the state cannot be obtained from the participant's state machine (no answer)
+        unreachable,
+        ///valid unloaded state
+        unloaded,
+        ///valid loaded state
+        loaded,
+        ///valid initialized state
+        initialized,
+        ///valid paused state
+        paused,
+        ///valid running state
+        running
+    };
+}
+namespace catelyn
 {
-    ///This state is used if a participant has no StateMachine or is not reachable (maybe shut down)
-    undefined,
-    ///This state is used if a state machine was detected before, but currently the state cannot be obtained (no answer)
-    unreachable,
-    ///valid unloaded state
-    unloaded,
-    ///valid loaded state
-    loaded,
-    ///valid initialized state
-    initialized,
-    ///valid paused state
-    paused,
-    ///valid running state
-    running
-};
-
 /**
 * @brief definition of the external service interface of the participant itself
-* @see participant_info.json file
+* @see participant_statemachine.json file
 */
-class IRPCParticipantStateMachine : public IRPCParticipantStateMachineDef
+class IRPCParticipantStateMachine : public fep3::rpc::catelyn::IRPCParticipantStateMachineDef
 {
 protected:
     /**
@@ -72,7 +68,7 @@ public:
      * @brief State for participants
      * @see ParticipantState
      */
-    using State = ParticipantState;
+    using State = fep3::rpc::arya::ParticipantState;
     /**
      * @brief Get the state of the participant
      *
@@ -129,7 +125,7 @@ public:
     virtual void shutdown() = 0;
 };
 }
-using arya::IRPCParticipantStateMachine;
+using catelyn::IRPCParticipantStateMachine;
 using arya::ParticipantState;
 }
 }

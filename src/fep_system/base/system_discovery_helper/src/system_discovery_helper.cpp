@@ -1,9 +1,17 @@
+
+/**
+ * Copyright 2023 CARIAD SE. 
+ *
+ * This Source Code Form is subject to the terms of the Mozilla
+ * Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
 #include "system_discovery_helper.h"
 #include <boost/range/adaptors.hpp>
 #include <algorithm>
 #include <sstream>
 #include <boost/range/algorithm.hpp>
-#include <a_util/strings.h>
+#include <a_util/strings/strings_functions.h>
 
 namespace
 {
@@ -151,7 +159,7 @@ DiscoveredParticipantsWithError discoverSystemParticipants(fep3::IServiceBus::IS
 
 std::optional<ParticipantAndSystemName> get_partictipant_and_system_name(const std::string& part_system_names_combined)
 {
-    auto splitted_id = a_util::strings::split(part_system_names_combined, "@", true);
+    auto splitted_id = a_util::strings::split(part_system_names_combined, "@");
     if (splitted_id.size() > 1)
     {
         const std::string& system_name = splitted_id[1];

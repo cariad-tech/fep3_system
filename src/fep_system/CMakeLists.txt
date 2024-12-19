@@ -1,17 +1,11 @@
-# Copyright @ 2021 VW Group. All rights reserved.
+# Copyright 2023 CARIAD SE. 
 #
-#     This Source Code Form is subject to the terms of the Mozilla
-#     Public License, v. 2.0. If a copy of the MPL was not distributed
-#     with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-#
-# If it is not possible or desirable to put the notice in a particular file, then
-# You may include the notice in a location (such as a LICENSE file in a
-# relevant directory) where a recipient would be likely to look for such a notice.
-#
-# You may add additional accurate notices of copyright ownership.
+# This Source Code Form is subject to the terms of the Mozilla
+# Public License, v. 2.0. If a copy of the MPL was not distributed
+# with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 if(NOT TARGET dev_essential)
-    find_package(dev_essential REQUIRED COMPONENTS date_time system process result strings xml pkg_rpc)
+    find_package(dev_essential REQUIRED COMPONENTS process result strings xml pkg_rpc)
 else()
     include(${dev_essential_SOURCE_DIR}/scripts/cmake/stub_generation.cmake)
 endif()
@@ -28,7 +22,8 @@ set(SYSTEM_SOURCES_PUBLIC
     ${PROJECT_SOURCE_DIR}/include/fep_system/system_logger_intf.h
     ${PROJECT_SOURCE_DIR}/include/fep_system/participant_proxy.h
     ${PROJECT_SOURCE_DIR}/include/fep_system/rpc_component_proxy.h
-    ${PROJECT_SOURCE_DIR}/include/fep_system/healthiness_types.h)
+    ${PROJECT_SOURCE_DIR}/include/fep_system/healthiness_types.h
+    )
 
 # install destination should not be forgotten: include/fep_system/rpc_services/rpc
 set(SYSTEM_EXT_PUBLIC_SOURCES_RPC
@@ -80,9 +75,18 @@ fep_generate_rpc_stubs_before_target(
     TARGET fep_system_rpc_stub_generator
     INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/participant_statemachine/participant_statemachine.json"
     OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
-    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::RPCStateMachineProxy
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::catelyn::RPCStateMachineProxy
     CLIENT_FILE_NAME participant_statemachine_proxy_stub.h
 )
+
+fep_generate_rpc_stubs_before_target(
+    TARGET fep_system_rpc_stub_generator
+    INPUT_FILE "${fep3_participant_INCLUDE_DIR}/fep3/rpc_services/participant_statemachine/participant_statemachine_arya.json"
+    OUTPUT_DIR "${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs"
+    CLIENT_CLASS_NAME fep3::rpc_proxy_stub::arya::RPCStateMachineProxy
+    CLIENT_FILE_NAME participant_statemachine_proxy_stub_arya.h
+)
+
 
 ###################################################
 # FEP 3 Clock
@@ -229,7 +233,8 @@ set(SYSTEM_PROXY_SOURCES_PRIVATE
 
     rpc_services/participant_statemachine_proxy.hpp
     ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/participant_statemachine_proxy_stub.h
-
+    ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/participant_statemachine_proxy_stub_arya.h
+    
     rpc_services/clock_proxy.hpp
     ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/clock_proxy_stub.h
 
@@ -270,20 +275,28 @@ set(PLUGIN_SOURCES_PRIVATE
 set(PLUGIN_SOURCES ${PLUGIN_CPP_SOURCES_PRIVATE} ${PLUGIN_SOURCES_PRIVATE})
 source_group(plugin\\cpp FILES ${PLUGIN_SOURCES})
 
-### evaentually some really target files
+### eventually some really target files
+set(SYSTEM_SOURCES_STATE_TRANSITION_PRIVATE
+    state_transition/fep_participant_proxy_state_transition.h
+    state_transition/fep_participant_proxy_state_transition.cpp)
 
 set(SYSTEM_SOURCES_PRIVATE
     fep_system.cpp
     participant_proxy.cpp
     system_logger.h
+    system_logger.cpp
     ${PROJECT_BINARY_DIR}/src/fep_system/fep_system_stubs/logging_sink_stub.h
     service_bus_wrapper.h
     service_bus_wrapper.cpp
-    private_participant_proxy.hpp)
+    private_participant_proxy.hpp
+    logging_sink_csv.h
+    system_logger_helper.h)
+
 
 add_library(${FEP3_SYSTEM_LIBRARY} SHARED
     ${SYSTEM_SOURCES_PUBLIC}
     ${SYSTEM_SOURCES_PRIVATE}
+    ${SYSTEM_SOURCES_STATE_TRANSITION_PRIVATE}
     ${SYSTEM_PROXY_SOURCES_PRIVATE}
     ${SYSTEM_EXT_PUBLIC_SOURCES_RPC}
     ${SYSTEM_EXT_PUBLIC_SOURCES_LOGGING_BASE}
@@ -355,21 +368,22 @@ else()
     set(BUILD_LIBRARY_FLAGS "-Wl,--start-group -Wl,--no-as-needed -Wl,--end-group")
 endif()
 
+find_package(Boost 1.73.0 REQUIRED COMPONENTS date_time)
+
 target_link_libraries(${FEP3_SYSTEM_LIBRARY}
     PRIVATE
-        dev_essential::datetime
-        dev_essential::system
-        dev_essential::process
         dev_essential::strings
         dev_essential::xml
         dev_essential::pkg_rpc
         system_discovery_helper
         health_service_helper
+        service_bus_helper
         fep3_component_registry
+        Boost::date_time
         ${CMAKE_DL_LIBS}
+        state_transition_helper
     PUBLIC
         ${BUILD_LIBRARY_FLAGS}
-
 )
 
 target_include_directories(${FEP3_SYSTEM_LIBRARY} PUBLIC
@@ -403,6 +417,7 @@ fep3_system_set_folder(${FEP3_SYSTEM_LIBRARY} system_library)
 source_group(system_library\\public FILES ${SYSTEM_SOURCES_PUBLIC})
 source_group(system_library FILES ${SYSTEM_SOURCES_PRIVATE})
 source_group(system_library\\proxy FILES ${SYSTEM_PROXY_SOURCES_PRIVATE})
+source_group(system_library\\state_transition FILES ${SYSTEM_SOURCES_STATE_TRANSITION_PRIVATE})
 
 #this is for configre in the fep3_system-config.cmake.in
 set(FEP3_USE_RTIDDS ${fep3_participant_use_rtidds})
